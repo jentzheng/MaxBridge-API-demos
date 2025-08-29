@@ -8,13 +8,12 @@ A key component is `Transformers.js`, which leverages WebGPU for inference in th
 
 ## Features
 
-- **Jitter Matrix to WebRTC**: Streams Jitter matrix data (UYVY) from Max to browsers using WebRTC for ultra-low latency.
+- **Jitter Matrix to WebRTC**: Streams Jitter matrix data from Max to browsers using WebRTC for ultra-low latency.
 - **TCP Socket Bridge**: Uses a TCP server to receive Jitter matrices from `[jit.net.send]` in Max.
-- **Automatic I420 Conversion**: Converts UYVY to I420 and then to RGBA for WebRTC video frames.
 - **WebRTC Peer Management**: Handles multiple browser clients with dynamic peer connection management.
-- **Socket.IO Signaling**: Uses Socket.IO for signaling and room management.
 - **Max/MSP Integration**: Communicates with Max/MSP using `max-api` for real-time data exchange and feedback.
 - **Object Detection Feedback**: Receives inference results from the browser and sends them back to Max.
+- **Mediapipe**
 
 ## Installation
 
@@ -38,18 +37,14 @@ npm install && npm run build
 ### Start the Node.js Bridge(for dev)
 
 ```sh
-npm run dev --server-port=7474 --remote-server=https://localhost:5173 --roomID=MaxMSPJitter
+npm run dev --jit-net-send-port=7474 --remote-server=ws://localhost:5173/ws --username Jitter
 ```
-
-- `--server-port`: TCP port for Jitter matrix input (from `[jit.net.send]`).
-- `--remote-server`: URL of the signaling server (default: `https://localhost:5173`).
-- `--roomID`: Room name for grouping clients (default: `MaxMSPJitter`).
 
 ### In Max/MSP/Jitter
 
 - Open `objectdetection.maxpat`.
-- start n4m `script start --remote-server=https://localhost:5173 --roomID=MaxMSPJitter --server-port=7474`
-- Use `[jit.net.send @host 127.0.0.1 @port 7474]` to send matrix data to the bridge's TCP port.
+- start n4m `script start --jit-net-send-port=7474 --remote-server=ws://localhost:5173/ws --username Jitter`
+- Use `[jit.net.send @port 7474]` to send matrix data to the bridge's TCP port.
 
 ### In the Browser
 
