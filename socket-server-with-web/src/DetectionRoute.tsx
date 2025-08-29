@@ -1,6 +1,6 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef } from "react";
 import { useConnection } from "./utils/hooks";
-import DetectorWorker from "./utils/worker-object-detection?worker&inline";
+import DetectorWorker from "./utils/worker-object-detection?worker";
 
 type Result = {
   type: string;
@@ -17,20 +17,37 @@ type Result = {
 };
 
 export const DetectionRoute = () => {
-  const { dc, remoteStream } = useConnection();
-  const videoEle = useRef<HTMLVideoElement>(null);
+  const { webRTCConnection, connectionState } = useConnection();
+  const inBoundVideoRef = useRef<HTMLVideoElement>(null);
   const canvasEle = useRef<HTMLCanvasElement>(null);
-  const detectorWorker = useMemo(() => new DetectorWorker(), []);
   const lastResultRef = useRef<Result>(null);
+  // const detectorWorker = useMemo(() => new DetectorWorker(), []);
 
   useEffect(() => {
-    const video = videoEle.current;
+    if (
+      !webRTCConnection ||
+      !webRTCConnection.pc ||
+      connectionState?.peerState !== "connected" ||
+      !inBoundVideoRef.current
+    ) {
+      return;
+    }
+
+    const recvs = webRTCConnection.pc.getReceivers();
+    if (recvs.length > 0) {
+      const track = recvs[0].track;
+      const stream = new MediaStream([track]);
+      inBoundVideoRef.current.srcObject = stream;
+      inBoundVideoRef.current.play();
+    }
+  }, [webRTCConnection, connectionState, inBoundVideoRef]);
+
+  useEffect(() => {
     const canvas = canvasEle.current;
+    const inVideo = inBoundVideoRef.current;
+    if (!canvas || !inVideo || !webRTCConnection) return;
 
-    if (!video || !canvas || !remoteStream || !dc) return;
-
-    video.srcObject = remoteStream;
-    video.play();
+    const detectorWorker = new DetectorWorker();
 
     const ctx = canvas.getContext("2d");
 
@@ -58,11 +75,12 @@ export const DetectionRoute = () => {
     let rid = 0;
 
     async function captureLoop() {
-      if (!video || !canvas || !ctx) return;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      if (!canvas || !ctx || !inVideo || !detectorWorker || !webRTCConnection)
+        return;
+      canvas.width = inVideo.videoWidth;
+      canvas.height = inVideo.videoHeight;
 
-      ctx.drawImage(video, 0, 0);
+      ctx.drawImage(inVideo, 0, 0);
 
       const rawImage = {
         data: ctx.getImageData(0, 0, canvas.width, canvas.height).data,
@@ -78,12 +96,12 @@ export const DetectionRoute = () => {
       rid = requestAnimationFrame(captureLoop);
     }
 
-    video.onloadeddata = () => {
+    inVideo.onloadeddata = () => {
       rid = requestAnimationFrame(captureLoop);
     };
 
     detectorWorker.onmessage = (event: MessageEvent) => {
-      dc.send(JSON.stringify(event.data));
+      webRTCConnection.dc?.send(JSON.stringify(event.data));
       lastResultRef.current = event.data;
     };
 
@@ -93,14 +111,20 @@ export const DetectionRoute = () => {
       detectorWorker.terminate();
       console.info("DetectionRoute unmounted");
     };
-  }, [remoteStream, detectorWorker, dc]);
+  }, [inBoundVideoRef, webRTCConnection]);
 
   return (
     <>
-      <video ref={videoEle} autoPlay playsInline muted className="hidden" />
+      <video
+        className="h-full w-auto m-auto hidden"
+        ref={inBoundVideoRef}
+        autoPlay
+        playsInline
+        muted
+      />
       <canvas
         ref={canvasEle}
-        className="block max-w-full  w-full m-auto bg-black "
+        className="block h-full w-full m-auto bg-black "
       />
     </>
   );

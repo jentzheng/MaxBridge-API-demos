@@ -1,10 +1,10 @@
 {
   "name": "n4m-jitter-bridge",
   "version": "1.0.0",
-  "main": "dist/jitter-bridge.js",
+  "main": "javascript/jitter-bridge-webrtc.js",
   "scripts": {
-    "start": "node javascript/jitter-bridge.js",
-    "dev": "tsx watch src/jitter-bridge.ts --server-port=7474",
+    "start": "node javascript/jitter-bridge-webrtc.js",
+    "dev": "tsx watch src/jitter-bridge-webrtc.ts",
     "build": "tsc",
     "build:watch": "tsc --watch"
   },
@@ -18,12 +18,13 @@
   "license": "ISC",
   "dependencies": {
     "@roamhq/wrtc": "^0.8.0",
-    "socket.io-client": "^4.8.1"
+    "ws": "latest"
   },
   "devDependencies": {
     "@types/max-api": "^2.0.0",
     "@types/node": "^16.18.23",
-    "tsx": "^4.19.4",
-    "typescript": "^5.8.3"
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
   }
 }

@@ -2,18 +2,18 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import tailwindcss from "@tailwindcss/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
-import CreateSocketIOServer from "./socketIO";
+import websocketServer from "./wsserver";
 
 function socketIOPlugin(): Plugin {
   return {
-    name: "socket-io",
+    name: "websocket-plugin",
     configureServer(server) {
       if (!server.httpServer) return;
-      CreateSocketIOServer(server.httpServer);
+      websocketServer(server.httpServer);
     },
     configurePreviewServer(server) {
       if (!server.httpServer) return;
-      CreateSocketIOServer(server.httpServer);
+      websocketServer(server.httpServer);
     },
   };
 }

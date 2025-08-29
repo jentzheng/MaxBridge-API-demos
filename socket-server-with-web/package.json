@@ -4,29 +4,30 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "SELF_SIGN_SSL=true vite dev",
+    "dev": "SELF_SIGN_SSL=false vite dev",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "SELF_SIGN_SSL=true vite preview"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.5.2",
-    "@roamhq/wrtc": "^0.9.0",
+    "@mediapipe/tasks-vision": "0.10.22-rc.20250304",
     "@tailwindcss/vite": "^4.1.8",
     "@vitejs/plugin-basic-ssl": "^2.0.0",
     "express": "^5.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router": "^7.6.2",
-    "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1",
-    "tailwindcss": "^4.1.8"
+    "tailwindcss": "^4.1.8",
+    "ws": "latest"
   },
   "devDependencies": {
     "@eslint/js": "^9.28.0",
     "@types/express": "^5.0.3",
+    "@types/max-api": "^2.0.3",
     "@types/react": "^19.1.7",
     "@types/react-dom": "^19.1.6",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react-swc": "^3.10.2",
     "@webgpu/types": "^0.1.61",
     "daisyui": "^5.0.43",

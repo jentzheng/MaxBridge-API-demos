@@ -1,290 +1,300 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { ConnectionContext } from "./utils/hooks";
+import { useState, useEffect, useCallback } from "react";
 import { NavLink, Outlet, useSearchParams } from "react-router";
-import { io, type Socket } from "socket.io-client";
+import SignalingClient, { type Client } from "./utils/signalingClient";
+import WebRTCConnection from "./utils/webRTCConnection";
+import { ConnectionContext, type ConnectionState } from "./utils/hooks";
 
 function App() {
-  const [socket, setSocket] = useState<Socket>();
-  const [pc, setPeerConnection] = useState<RTCPeerConnection>();
-  const [dc, setDataChannel] = useState<RTCDataChannel>();
-  const [remoteStream, setRemoteStream] = useState<MediaStream>();
-  const remoteUserIdRef = useRef<string>(null);
-
-  const [connectionState, setConnectionState] = useState({
-    isSocketIOConnected: false,
-    iceconnectionState: "unknown",
-    connectionState: "unknown",
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [formState, setFormState] = useState({
+    username: searchParams.get("username") || "Chrome#1",
+    address:
+      searchParams.get("address") ||
+      `${window.location.protocol === "http:" ? "ws://" : "wss://"}${
+        window.location.hostname
+      }:${window.location.port}/ws`,
+    jitRecvPort: searchParams.get("jitRecvPort") || 7575,
   });
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [socketClient, setSocketClient] = useState<SignalingClient>();
+  const [clients, setClients] = useState<Client[]>([]);
 
-  const [formState, setFormState] = useState({
-    roomId: searchParams.get("roomId") || "MaxMSPJitter",
-    jit_net_recv_port: searchParams.get("jit_net_recv_port") || "7575",
+  const [webRTCConnection, setWebRTCConnection] = useState<WebRTCConnection>();
+  const [dataChannel, setDataChannel] = useState<RTCDataChannel>();
+
+  const [connectionState, setConnectionState] = useState<ConnectionState>({
+    isSocketConnect: false,
+    peerState: "unknown",
+    dataChannelState: "unknown",
   });
 
   useEffect(() => {
     setSearchParams({
-      roomId: formState.roomId,
-      jit_net_recv_port: formState.jit_net_recv_port,
+      username: formState.username,
+      address: formState.address,
+      jitRecvPort: formState.jitRecvPort.toString(),
     });
   }, [formState, setSearchParams]);
+
+  // initial rendering
+  const username = searchParams.get("username");
+  const address = searchParams.get("address");
+  const jitRecvPort = searchParams.get("jitRecvPort");
+
+  useEffect(() => {
+    const signalingClient = new SignalingClient(setConnectionState, setClients);
+
+    if (address && username && jitRecvPort) {
+      const url = new URL(address);
+      url.searchParams.set("username", username);
+      url.searchParams.set("role", "browser");
+      url.searchParams.set("jitRecvPort", jitRecvPort);
+      signalingClient.connect(url);
+    }
+
+    setSocketClient(signalingClient);
+
+    const webRTCConnection = new WebRTCConnection(
+      signalingClient,
+      setDataChannel
+    );
+
+    setWebRTCConnection(webRTCConnection);
+
+    return () => {
+      signalingClient.disconnect();
+    };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormState((prev) => ({ ...prev, [name]: value }));
   };
 
-  const connectSocketIO = useCallback((state: typeof formState) => {
-    const socket = io({
-      query: {
-        roomId: state.roomId,
-        name: "Chrome Browser",
-        role: "guest",
-        jitRecvPort: parseInt(state.jit_net_recv_port),
-      },
-    });
+  const handleConnect = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
 
-    setSocket(socket);
-  }, []);
+      const url = new URL(formState.address);
+      url.searchParams.set("username", formState.username);
+      url.searchParams.set("role", "browser");
+      url.searchParams.set("jitRecvPort", formState.jitRecvPort.toString());
 
-  const disconnectSocketIO = useCallback(() => {
-    pc?.close();
-    socket?.disconnect();
-    setPeerConnection(undefined);
-  }, [pc, socket]);
-
-  const handleConnect = useCallback(() => {
-    if (socket?.connected) {
-      disconnectSocketIO();
-    } else {
-      connectSocketIO(formState);
-    }
-  }, [socket, disconnectSocketIO, connectSocketIO, formState]);
-
-  useEffect(() => {
-    connectSocketIO(formState);
-  }, []);
-
-  useEffect(() => {
-    if (!socket) return;
-    const pc = new RTCPeerConnection();
-    // pc.addTransceiver("video", { direction: "sendrecv" });
-    setPeerConnection(pc);
-
-    socket.on("connect", () => {
-      setConnectionState((prev) => ({ ...prev, isSocketIOConnected: true }));
-      socket.emit("join");
-    });
-
-    socket.on("disconnect", () => {
-      setConnectionState((prev) => ({ ...prev, isSocketIOConnected: false }));
-    });
-
-    pc.onnegotiationneeded = async () => {
-      // IT should tell node4m to resend offer
-      if (remoteUserIdRef.current && pc.connectionState !== "new") {
-        socket.emit("requestOffer", {
-          to: remoteUserIdRef.current,
-        });
+      if (connectionState.isSocketConnect) {
+        socketClient?.disconnect();
+      } else {
+        socketClient?.connect(url);
       }
-    };
+    },
+    [socketClient, connectionState, formState]
+  );
 
-    pc.onicecandidate = async (event) => {
-      if (event.candidate && remoteUserIdRef.current) {
-        console.log("onicecandidate", event.type, remoteUserIdRef.current);
-        socket.emit("signal", {
-          to: remoteUserIdRef.current,
-          candidate: event.candidate,
-        });
-      }
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      console.log("pc.iceconnectionState:", pc.iceConnectionState);
-      setConnectionState((prev) => ({
-        ...prev,
-        iceconnectionState: pc.iceConnectionState,
-      }));
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log("pc.connectionState:", pc.connectionState);
-      setConnectionState((prev) => ({
-        ...prev,
-        connectionState: pc.connectionState,
-      }));
-    };
-
-    pc.ontrack = (event) => {
-      setRemoteStream(event.streams[0]);
-    };
-
-    pc.ondatachannel = async (event) => {
-      setDataChannel(event.channel);
-    };
-
-    socket.on(
-      "signal",
-      async ({
-        from,
-        description,
-        candidate,
-      }: {
-        from: string;
-        description: RTCSessionDescription;
-        candidate: RTCIceCandidate;
-      }) => {
-        if (description) {
-          // console.log(from, description.type);
-          if (description.type === "offer") {
-            remoteUserIdRef.current = from;
-
-            await pc.setRemoteDescription(description);
-
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-
-            socket.emit("signal", {
-              to: from,
-              description: pc.localDescription,
-            });
-          }
-        } else if (candidate) {
-          await pc.addIceCandidate(candidate);
-        }
-      }
-    );
-
-    return () => {
-      pc.onnegotiationneeded = null;
-      pc.onicecandidate = null;
-      pc.oniceconnectionstatechange = null;
-      pc.onconnectionstatechange = null;
-      pc.ontrack = null;
-      pc.ondatachannel = null;
-      pc.close();
-
-      socket.off("connect");
-      socket.off("disconnect");
-      socket.close();
-    };
-  }, [socket]);
+  // auto connect rtc
+  // useEffect(() => {
+  //   if (connectionState.peerState !== "connected") {
+  //     const jitterClient = clients.find((c) => c.properties.role === "jitter");
+  //     // if (jitterClient) {
+  //     //   webRTCConnection?.onCallStart(
+  //     //     jitterClient.id,
+  //     //     jitterClient?.properties
+  //     //   );
+  //     // }
+  //   }
+  // }, [clients, webRTCConnection]);
 
   return (
-    <ConnectionContext.Provider value={{ remoteStream, pc, dc }}>
-      <div className="drawer lg:drawer-open" data-theme="cupcake">
-        {/* Sidebar Toggle Button */}
-        <input id="sidebar-toggle" type="checkbox" className="drawer-toggle" />
-
-        {/* Main Layout */}
-        <div className="drawer-content flex flex-col max-h-screen">
-          {/* Header: hamburger + nav links */}
-          <header className="flex items-center gap-4 px-4 py-2  bg-base-100">
-            <label
-              htmlFor="sidebar-toggle"
-              className="btn btn-square btn-ghost lg:hidden"
+    <div className="drawer lg:drawer-open">
+      {/* Sidebar Toggle Button */}
+      <input id="sidebar-toggle" type="checkbox" className="drawer-toggle" />
+      {/* Main Layout */}
+      <div className="drawer-content min-h-screen flex flex-col">
+        {/* Header: hamburger + nav links */}
+        <header className="flex items-center gap-4 px-4 py-2  bg-base-100">
+          <label
+            htmlFor="sidebar-toggle"
+            className="btn btn-square btn-ghost lg:hidden"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-            </label>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+          </label>
 
-            <nav
-              role="tablist"
-              className="tabs tabs-bordered flex-grow overflow-x-auto"
+          <nav
+            role="tablist"
+            className="tabs tabs-bordered flex-grow overflow-x-auto"
+          >
+            <NavLink
+              role="tab"
+              className={({ isActive }) =>
+                isActive ? "tab tab-active" : "tab"
+              }
+              to="/"
             >
-              <NavLink
-                role="tab"
-                className={({ isActive }) =>
-                  isActive ? "tab tab-active" : "tab"
-                }
-                to="/"
-              >
-                Detection
-              </NavLink>
-              <NavLink
-                role="tab"
-                className={({ isActive }) =>
-                  isActive ? "tab tab-active" : "tab"
-                }
-                to="/camera"
-              >
-                Camera
-              </NavLink>
-            </nav>
-          </header>
-
-          {/* Main Content */}
-          <main className="bg-gray-600 flex-1 overflow-auto">
+              Test
+            </NavLink>
+            <NavLink
+              role="tab"
+              className={({ isActive }) =>
+                isActive ? "tab tab-active" : "tab"
+              }
+              to="/camera"
+            >
+              Camera
+            </NavLink>
+            <NavLink
+              role="tab"
+              className={({ isActive }) =>
+                isActive ? "tab tab-active" : "tab"
+              }
+              to="/detection"
+            >
+              Detection
+            </NavLink>
+            <NavLink
+              role="tab"
+              className={({ isActive }) =>
+                isActive ? "tab tab-active" : "tab"
+              }
+              to="/facelandmark"
+            >
+              Face Landmark
+            </NavLink>
+          </nav>
+        </header>
+        {/* Main Content */}
+        <main className="bg-gray-600 flex-1   ">
+          <ConnectionContext.Provider
+            value={{
+              webRTCConnection: webRTCConnection,
+              dataChannel,
+              connectionState,
+            }}
+          >
             <Outlet />
-          </main>
-        </div>
-
-        {/* Sidebar */}
-        <aside className="drawer-side">
-          <label htmlFor="sidebar-toggle" className="drawer-overlay"></label>
-          <div className="menu p-4 w-80 min-h-full bg-base-200 text-base-content">
-            <form action={handleConnect}>
-              <div className="grid gap-4">
-                <label className="form-control w-full">
-                  <div className="label">
-                    <span className="label-text">Room ID</span>
-                  </div>
-                  <input
-                    type="text"
-                    name="roomId"
-                    className="input input-bordered w-full"
-                    disabled={socket?.connected}
-                    value={formState.roomId}
-                    onChange={handleChange}
-                  />
-                </label>
-
-                <label className="form-control w-full">
-                  <div className="label">
-                    <span className="label-text">JitRecvPort</span>
-                  </div>
-                  <input
-                    type="number"
-                    name="jit_net_recv_port"
-                    className="input input-bordered w-full"
-                    disabled={socket?.connected}
-                    value={formState.jit_net_recv_port}
-                    onChange={handleChange}
-                  />
-                </label>
-
-                <button type="submit" className="btn btn-primary">
-                  {socket?.connected ? "Disconnect" : "Connect"}
-                </button>
-              </div>
-            </form>
-
-            <ul className="mt-1">
-              <li>
-                {connectionState.isSocketIOConnected
-                  ? `Socket.IO: Connected ✅`
-                  : "Socket.IO: Disconnected ❌"}
-              </li>
-              <li>ICEConnectionState: {connectionState.iceconnectionState}</li>
-              <li>ConnectionState: {connectionState.connectionState}</li>
-            </ul>
-          </div>
-        </aside>
+          </ConnectionContext.Provider>
+        </main>
       </div>
-    </ConnectionContext.Provider>
+
+      <aside className="drawer-side ">
+        <label htmlFor="sidebar-toggle" className="drawer-overlay"></label>
+
+        <div className="min-h-full bg-base-200">
+          <form onSubmit={handleConnect} className="p-4">
+            <div className="grid gap-4">
+              {/* <label className="form-control w-full">
+                <div className="label">
+                  <span className="label-text">id</span>
+                </div>
+                <input
+                  type="text"
+                  name="id"
+                  className="input input-bordered w-full"
+                  disabled={true}
+                  value={localStorage.getItem("localId") || undefined}
+                />
+                <p className="label text-sm">presist in local storage</p>
+              </label> */}
+
+              <label className="form-control w-full">
+                <div className="label">
+                  <span className="label-text">username</span>
+                </div>
+                <input
+                  type="text"
+                  name="username"
+                  className="input input-bordered w-full"
+                  disabled={connectionState.isSocketConnect}
+                  value={formState.username}
+                  onChange={handleChange}
+                />
+              </label>
+
+              <label className="form-control w-full">
+                <div className="label">
+                  <span className="label-text">address</span>
+                </div>
+                <input
+                  type="text"
+                  name="address"
+                  className="input input-bordered w-full"
+                  disabled={connectionState.isSocketConnect}
+                  value={formState.address}
+                  onChange={handleChange}
+                />
+              </label>
+
+              <label className="form-control w-full">
+                <div className="label">
+                  <span className="label-text">Jit Recv Port</span>
+                </div>
+                <input
+                  type="text"
+                  name="jitRecvPort"
+                  className="input input-bordered w-full"
+                  disabled={connectionState.isSocketConnect}
+                  value={formState.jitRecvPort}
+                  onChange={handleChange}
+                />
+              </label>
+
+              <button type="submit" className="btn btn-primary">
+                {connectionState.isSocketConnect ? "Disconnect" : "Connect"}
+              </button>
+            </div>
+          </form>
+
+          <ul className="my-4 p-4 text-xs">
+            <li>{`Socket status: ${connectionState.isSocketConnect}`}</li>
+            <li>PC state: {connectionState.peerState}</li>
+            <li>DC state: {connectionState.dataChannelState}</li>
+          </ul>
+
+          <ul className="list my-4 p-4">
+            <li className="text-sm tracking-wide">WebSocket Clients</li>
+            {clients.map((client, i) => {
+              return (
+                <li key={i} className="list-row gap-2 p-0">
+                  <div>
+                    <p>{String(client.properties.username)}</p>
+                    <p className="text-xs text-info">{client.id}</p>
+                  </div>
+                  <div className="ml-auto gap-2 flex">
+                    <button
+                      className="btn btn-primary btn-xs"
+                      onClick={() =>
+                        webRTCConnection?.onCallStart(
+                          client.id,
+                          client.properties
+                        )
+                      }
+                    >
+                      Call
+                    </button>
+                    <button
+                      className="btn btn-warning btn-xs"
+                      onClick={() => webRTCConnection?.onCallEnd()}
+                    >
+                      Hang Up
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </aside>
+    </div>
   );
 }
 
