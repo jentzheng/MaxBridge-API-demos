@@ -1,69 +1,78 @@
-# n4m-jitter-bridge
+# React + TypeScript + Vite
 
-![screenshot](/screenshot.png)
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-**n4m-jitter-bridge** is a Node.js-based bridge for real-time communication between Max/MSP/Jitter and web clients. It enables low-latency streaming of Jitter matrix data (video frames) to browsers, supporting both object detection and custom data handling.
+Currently, two official plugins are available:
 
-A key component is `Transformers.js`, which leverages WebGPU for inference in the browser. You can also dedicate the inference task to a second computer—simply run the web client on another machine and connect it to the bridge, offloading heavy ML inference from your main Max/Jitter workstation.
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-## Features
+## React Compiler
 
-- **Jitter Matrix to WebRTC**: Streams Jitter matrix data from Max to browsers using WebRTC for ultra-low latency.
-- **TCP Socket Bridge**: Uses a TCP server to receive Jitter matrices from `[jit.net.send]` in Max.
-- **WebRTC Peer Management**: Handles multiple browser clients with dynamic peer connection management.
-- **Max/MSP Integration**: Communicates with Max/MSP using `max-api` for real-time data exchange and feedback.
-- **Object Detection Feedback**: Receives inference results from the browser and sends them back to Max.
-- **Mediapipe**
+The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
 
-## Installation
+Note: This will impact Vite dev & build performances.
+You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
 
-Clone the repository:
+## Expanding the ESLint configuration
 
-```sh
-cd ~/Documents/Max\ 9/Library
-git clone https://github.com/jentzheng/n4m-jitter-bridge.git
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
+
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+
 ```
 
-Install dependencies:
+You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
 
-```sh
-pnpm install && pnpm run build
-# or
-npm install && npm run build
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+
 ```
-
-## Usage
-
-### Start the Node.js Bridge(for dev)
-
-```sh
-npm run dev --jit-net-send-port=7474 --remote-server=ws://localhost:5173/ws --username Jitter
-```
-
-### In Max/MSP/Jitter
-
-- Open `objectdetection.maxpat`.
-- start n4m `script start --jit-net-send-port=7474 --remote-server=ws://localhost:5173/ws --username Jitter`
-- Use `[jit.net.send @port 7474]` to send matrix data to the bridge's TCP port.
-
-### In the Browser
-
-```sh
-cd socket-server-with-web
-npm install
-npm run dev
-```
-
-- Open <https://localhost:5173> in your browser.
-- The app will auto-connect to the bridge using the current host and port.
-
-> **Note:**  
-> The development server uses a self-signed SSL certificate (`SELF_SIGN_SSL=true`) so you can access the app over HTTPS.  
-> This is required because browsers only allow camera and microphone access on secure origins (HTTPS or localhost).  
-> By enabling HTTPS with a self-signed certificate, you can test remote camera capture and WebRTC features locally or on your LAN.
-
-## TODO
-
-- add p5js example
-- Add more model inference examples like YOLO-pose or YOLO-seg.
-- Support for multiple simultaneous segmentation results.
