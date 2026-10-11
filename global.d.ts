@@ -8,7 +8,7 @@ type StreamingOptions = {
 type JitterImage = {
   width: number;
   height: number;
-  data: ImageDataArray; // Uint8ClampedArray
+  data: Uint8ClampedArray<ArrayBuffer>;
 };
 
 type JitterMatrix =
@@ -24,6 +24,8 @@ type StreamingMetadata = {
   dropped: number;
 };
 
+type MaxDict = Record<string, number | string | MaxArray | MaxDict>;
+
 interface Max {
   bindInlet(name: string, callback: (args?: any[]) => void): void;
   post(message: string): void;
@@ -36,6 +38,8 @@ interface Max {
     callback: (args: JitterMatrix & StreamingMetadata) => void,
     opts?: StreamingOptions,
   ): void;
+  setJitterMatrix(name: string, matrix: JitterMatrix): void;
+  setDict(name: string, dict: MaxDict): void;
   setJitterMatrix(name: string, matrix: JitterMatrix): void;
 }
 
