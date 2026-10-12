@@ -29,13 +29,18 @@ export function App() {
   const wsProtocol = origin.protocol === "https:" ? "wss:" : "ws:";
   const wsURL = new URL(`${wsProtocol}//${origin.host}/ws`);
 
+  const maxWs = "ws://localhost:8081";
+
   const username = router.latestLocation.search.username || "Guest";
   const wshook = useWebSocket(
-    wsURL.toString(),
+    maxWs,
     {
       queryParams: {
         username: username,
         role: "sender",
+      },
+      onOpen: (event) => {
+        wshook.sendJsonMessage({ username: username, role: "sender" });
       },
     },
     !window.max,

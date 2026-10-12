@@ -4,6 +4,9 @@ type MaxMatrixData = Uint8Array | Int32Array | Float32Array | Float64Array;
 type WebSocket = import("ws").WebSocket;
 declare const WebSocket: typeof import("ws").WebSocket;
 
+type WebSocketServer = import("ws").WebSocketServer;
+declare const WebSocketServer: typeof import("ws").WebSocketServer;
+
 declare let autowatch: 0 | 1;
 declare let inlets: number;
 declare let outlets: number;
@@ -20,6 +23,7 @@ declare class JitterMatrix {
   adapt: 0 | 1;
   copyarraytomatrix(data: MaxMatrixData | ArrayBufferView): void;
   copymatrixtoarray(data: MaxMatrixData): void;
+  clear(): void;
 }
 
 declare const outlet: (index: number, ...args: unknown[]) => void;

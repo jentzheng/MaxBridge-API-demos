@@ -1,22 +1,19 @@
 {
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.max.tsbuildinfo",
-    "target": "es2025",
     "lib": ["ES2025"],
+    "module": "none",
+    "ignoreDeprecations": "6.0",
     "skipLibCheck": true,
 
-    /* Max v8 loads a plain script: no import/export, no module wrapper */
-    "module": "esnext",
-    "moduleDetection": "legacy",
-
+    "esModuleInterop": true,
     /* Output */
-    "rootDir": ".",
+    "rootDir": "./v8-src",
     "outDir": "./examples",
     "noEmit": false,
 
     /* Linting */
-    "strict": true,
-    "noFallthroughCasesInSwitch": true
+    "strict": true
   },
-  "include": ["./v8-wsclient.ts", "jsthis.d.ts"]
+  "include": ["./v8-src/*.ts", "jsthis.d.ts"]
 }

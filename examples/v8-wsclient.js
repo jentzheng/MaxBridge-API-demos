@@ -1,4 +1,5 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 outlets = 1;
 outlettypes = ["jit_matrix"];
 const url = `ws://localhost:5173/ws?username=maxmsp&role=receiver`;

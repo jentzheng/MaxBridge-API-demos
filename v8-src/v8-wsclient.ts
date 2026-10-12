@@ -60,3 +60,5 @@ socket.onmessage = (event) => {
     matrix.copyarraytomatrix(pixelData);
   }
 };
+
+export {};
