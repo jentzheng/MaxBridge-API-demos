@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "vite",
     "dev:max": "tsc -p tsconfig.max.json --watch",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && cross-env BASE_URL=myrepo vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "preview:https": "SELF_SIGN_SSL=true vite preview "
+    "preview:https": "cross-env SELF_SIGN_SSL=true vite preview "
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.1.0",
@@ -40,6 +40,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "@webgpu/types": "^0.1.74",
     "babel-plugin-react-compiler": "^1.0.0",
+    "cross-env": "^10.1.0",
     "daisyui": "^5.7.47",
     "eslint": "^10.12.0",
     "eslint-plugin-perfectionist": "^5.12.1",

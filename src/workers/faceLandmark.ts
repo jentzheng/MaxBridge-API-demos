@@ -5,15 +5,12 @@ const numFaces = parseInt(urlParams.get("numFaces") || "3");
 
 const appRoot = new URL(import.meta.env.BASE_URL, import.meta.url);
 
-const wasmPath = new URL("models/mediapipe/wasm/", appRoot);
-const modelPath = new URL(
-  "models/mediapipe/face_landmarker/float16/1/face_landmarker.task",
-  appRoot,
-);
-const vision = await FilesetResolver.forVisionTasks(wasmPath.href, true);
+const wasmUrl = `${appRoot.href}/models/mediapipe/wasm/`;
+const modelUrl = `${appRoot.href}/models/mediapipe/face_landmarker/float16/1/face_landmarker.task`;
+const vision = await FilesetResolver.forVisionTasks(wasmUrl, true);
 const model = await FaceLandmarker.createFromOptions(vision, {
   baseOptions: {
-    modelAssetPath: modelPath.href,
+    modelAssetPath: modelUrl,
     delegate: "GPU",
   },
   numFaces: numFaces,

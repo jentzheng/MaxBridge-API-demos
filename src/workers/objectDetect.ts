@@ -10,14 +10,12 @@ const maxResults = parseInt(urlParams.get("maxResults") || "3");
 const scoreThreshold = parseFloat(urlParams.get("scoreThreshold") || "0.5");
 
 const appRoot = new URL(import.meta.env.BASE_URL, import.meta.url);
-
-const wasmPath = new URL("models/mediapipe/wasm/", appRoot);
-const modelPath = new URL("models/mediapipe/object_detector/efficientdet_lite0.tflite", appRoot);
-
-const vision = await FilesetResolver.forVisionTasks(wasmPath.href, true);
+const wasmUrl = `${appRoot.href}/models/mediapipe/wasm/`;
+const modelUrl = `${appRoot.href}/models/mediapipe/object_detector/efficientdet_lite0.tflite`;
+const vision = await FilesetResolver.forVisionTasks(wasmUrl, true);
 const model = await ObjectDetector.createFromOptions(vision, {
   baseOptions: {
-    modelAssetPath: modelPath.href,
+    modelAssetPath: modelUrl,
     delegate: "GPU",
   },
   maxResults: maxResults,
