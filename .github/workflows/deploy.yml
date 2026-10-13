@@ -38,7 +38,10 @@ jobs:
         with:
           node-version: "lts/*"
           cache: "pnpm"
-      - run: pnpm install && pnpm build
+      - name: Build project
+        run: pnpm install && pnpm build
+        env:
+          BASE_URL: ${{github.event.repository.name}}
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
