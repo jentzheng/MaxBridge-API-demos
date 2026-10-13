@@ -33,10 +33,60 @@ type Props = {
   onFrame: (video: HTMLVideoElement, seq: number, uyvyFrame: UYVYFrame) => void;
 };
 
+function useDevice() {
+  const [permissionStatus, setPermissionStatus] = useState<PermissionStatus | null>(null);
+  const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
+  const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshDevices = useCallback(async () => {
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: "camera" });
+      setPermissionStatus(permissionStatus);
+      const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = mediaDevices.filter((d) => d.kind === "audioinput");
+      const videoInputs = mediaDevices.filter((d) => d.kind === "videoinput");
+      setAudioInputs(audioInputs);
+      setVideoInputs(videoInputs);
+      return { audioInputs, videoInputs, permissionStatus };
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+  }, []);
+
+  useEffect(() => {
+    const mediaDevices = navigator.mediaDevices;
+    if (!mediaDevices) {
+      console.warn("MediaDevices API not available");
+      return;
+    }
+
+    (async () => {
+      await refreshDevices();
+    })();
+
+    const handleDeviceChange = () => {
+      console.log("Device change detected");
+      refreshDevices();
+    };
+
+    mediaDevices.addEventListener("devicechange", handleDeviceChange);
+
+    return () => {
+      mediaDevices.removeEventListener("devicechange", handleDeviceChange);
+    };
+  }, [refreshDevices]);
+
+  return { permissionStatus, audioInputs, videoInputs, error, refreshDevices };
+}
+
 export default function CameraComponent({ onFrame }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const frameRef = useRef<number>(-1);
   const trackRef = useRef<MediaStreamTrack | null>(null);
+
+  const { audioInputs, videoInputs, permissionStatus, error } = useDevice();
 
   const [resolutionIdx, setResolutionIdx] = useState(() => {
     const index = Number(localStorage.getItem(LOCAL_RES_KEY));
@@ -46,12 +96,11 @@ export default function CameraComponent({ onFrame }: Props) {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(() =>
     localStorage.getItem(LOCAL_DEV_KEY),
   );
-  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   // const [zoomRange, setZoomRange] = useState<ZoomRange | null>(null);
   // const [zoom, setZoom] = useState(1);
   // Get camera list
 
-  const changeDevice = useCallback((deviceId: string) => {
+  const switchDevice = useCallback((deviceId: string, constraints: MediaTrackConstraints) => {
     setSelectedDeviceId(deviceId);
     localStorage.setItem(LOCAL_DEV_KEY, deviceId);
   }, []);
@@ -61,27 +110,12 @@ export default function CameraComponent({ onFrame }: Props) {
     localStorage.setItem(LOCAL_RES_KEY, String(index));
   }, []);
 
-  useEffect(() => {
-    navigator.mediaDevices
-      .getUserMedia({
-        video: true,
-      })
-      .then(() => {
-        navigator.mediaDevices.enumerateDevices().then((mediaDevices) => {
-          const videoInputs = mediaDevices.filter((d) => d.kind === "videoinput");
-          setVideoDevices(videoInputs);
-          if (videoInputs.length > 0 && !selectedDeviceId) {
-            changeDevice(videoInputs[0].deviceId);
-          }
-        });
-      });
-  }, [selectedDeviceId, changeDevice]);
-
   // Start camera
   // const testCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const startCamera = useCallback(
     async (video: HTMLVideoElement, selectedDeviceId: string, resolutionIdx: number) => {
       const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
         video: {
           deviceId: { exact: selectedDeviceId },
           width: resolutions[resolutionIdx].width,
@@ -103,10 +137,8 @@ export default function CameraComponent({ onFrame }: Props) {
     const renderer = new WebGLRenderer();
 
     const loop = async (now: number, metadata: VideoFrameCallbackMetadata) => {
-      if (metadata.width > 0 && metadata.height > 0) {
-        const uyvy = renderer.draw(video);
-        onFrame(video, now, uyvy);
-      }
+      const uyvy = renderer.draw(video);
+      onFrame(video, now, uyvy);
       frameRef.current = video.requestVideoFrameCallback(loop);
     };
     frameRef.current = video.requestVideoFrameCallback(loop);
@@ -142,6 +174,8 @@ export default function CameraComponent({ onFrame }: Props) {
     <div className="relative flex flex-col h-full w-full bg-black">
       {/* <canvas ref={testCanvasRef} className="absolute w-50 h-50 top-0 left-0 bg-amber-400" /> */}
 
+      {error && <p className=" bg-red-500 text-white p-2">{error}</p>}
+
       <video
         ref={videoRef}
         className="block h-full w-full max-h-full max-w-full object-contain"
@@ -168,9 +202,9 @@ export default function CameraComponent({ onFrame }: Props) {
           <select
             className="select select-sm w-auto max-w-56"
             value={selectedDeviceId ?? ""}
-            onChange={(e) => changeDevice(e.target.value)}
+            onChange={(e) => switchDevice(e.target.value, {})}
           >
-            {videoDevices.map((device, index) => (
+            {videoInputs.map((device, index) => (
               <option key={device.deviceId} value={device.deviceId}>
                 {device.label || `Camera ${index + 1}`}
               </option>

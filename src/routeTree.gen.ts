@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FaceLandmarkRouteImport } from './routes/faceLandmark'
 import { Route as ObjectDetectRouteImport } from './routes/objectDetect'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaceLandmarkRoute = FaceLandmarkRouteImport.update({
+  id: '/faceLandmark',
+  path: '/faceLandmark',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ObjectDetectRoute = ObjectDetectRouteImport.update({
@@ -25,27 +31,31 @@ const ObjectDetectRoute = ObjectDetectRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/faceLandmark': typeof FaceLandmarkRoute
   '/objectDetect': typeof ObjectDetectRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/faceLandmark': typeof FaceLandmarkRoute
   '/objectDetect': typeof ObjectDetectRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/faceLandmark': typeof FaceLandmarkRoute
   '/objectDetect': typeof ObjectDetectRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/objectDetect'
+  fullPaths: '/' | '/faceLandmark' | '/objectDetect'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/objectDetect'
-  id: '__root__' | '/' | '/objectDetect'
+  to: '/' | '/faceLandmark' | '/objectDetect'
+  id: '__root__' | '/' | '/faceLandmark' | '/objectDetect'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  FaceLandmarkRoute: typeof FaceLandmarkRoute
   ObjectDetectRoute: typeof ObjectDetectRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faceLandmark': {
+      id: '/faceLandmark'
+      path: '/faceLandmark'
+      fullPath: '/faceLandmark'
+      preLoaderRoute: typeof FaceLandmarkRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/objectDetect': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  FaceLandmarkRoute: FaceLandmarkRoute,
   ObjectDetectRoute: ObjectDetectRoute,
 }
 export const routeTree = rootRouteImport

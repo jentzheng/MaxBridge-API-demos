@@ -7,10 +7,11 @@ import { routeTree } from "./routeTree.gen";
 import "./styles.css";
 
 const hashHistory = createHashHistory();
+// const history = createHistory();
 
 const router = createRouter({
   routeTree,
-  history: hashHistory,
+  // history: hashHistory,
   context: {
     websocket: undefined!,
   },
@@ -25,35 +26,9 @@ declare module "@tanstack/react-router" {
 const rootElement = document.getElementById("root")!;
 
 export function App() {
-  const origin = new URL(router.origin);
-  const wsProtocol = origin.protocol === "https:" ? "wss:" : "ws:";
-  const wsURL = new URL(`${wsProtocol}//${origin.host}/ws`);
-
-  const maxWs = "ws://localhost:8081";
-
-  const username = router.latestLocation.search.username || "Guest";
-  const wshook = useWebSocket(
-    maxWs,
-    {
-      queryParams: {
-        username: username,
-        role: "sender",
-      },
-      onOpen: (event) => {
-        wshook.sendJsonMessage({ username: username, role: "sender" });
-      },
-    },
-    !window.max,
-  );
-
-  return (
-    <RouterProvider
-      router={router}
-      context={{
-        websocket: wshook,
-      }}
-    />
-  );
+  const wsAddress = router.latestLocation.search.wsaddress!;
+  const websocket = useWebSocket(wsAddress);
+  return <RouterProvider router={router} context={{ websocket }} />;
 }
 
 const root = createRoot(rootElement);

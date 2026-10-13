@@ -7,6 +7,7 @@ import { z } from "zod";
 const searchParam = z.object({
   // host: z.string().default("localhost"),
   // port: z.number().default(5173),
+  wsaddress: z.string().default("ws://localhost:8081"),
   username: z.string().default("Guest"),
 });
 
@@ -24,9 +25,7 @@ function RootComponent() {
   const navigate = Route.useNavigate();
   const { getWebSocket } = websocket;
   const ws = getWebSocket();
-
   const readyState = ws?.readyState || 0;
-
   const connectionStatus = {
     [ReadyState.CONNECTING]: "Connecting",
     [ReadyState.OPEN]: "Open",
@@ -37,8 +36,7 @@ function RootComponent() {
 
   const form = useForm({
     defaultValues: {
-      // host: searchParams.host,
-      // port: searchParams.port,
+      wsaddress: searchParams.wsaddress,
       username: searchParams.username,
     },
     validators: {
@@ -47,8 +45,8 @@ function RootComponent() {
     onSubmit: async ({ value }) => {
       // Do something with form data
       navigate({
-        search: (prev) => ({ ...prev, username: value.username }),
-        // reloadDocument: false,
+        search: (prev) => ({ ...prev, username: value.username, wsaddress: value.wsaddress }),
+        reloadDocument: true,
       });
     },
   });
@@ -83,17 +81,13 @@ function RootComponent() {
           <div className="px-4">MaxBridge Demos</div>
           <ul className="menu menu-horizontal px-1">
             <li>
-              <Link to="/" replace={true} search={(prev) => ({ ...prev, numFaces: 3 })}>
-                FaceLandmark
-              </Link>
+              <Link to="/">CamOnly</Link>
             </li>
             <li>
-              <Link
-                to="/objectDetect"
-                search={(prev) => ({ ...prev, username: searchParams.username })}
-              >
-                ObjectDetector
-              </Link>
+              <Link to="/faceLandmark">FaceLandmark</Link>
+            </li>
+            <li>
+              <Link to="/objectDetect">ObjectDetector</Link>
             </li>
           </ul>
         </nav>
@@ -138,14 +132,13 @@ function RootComponent() {
                 }}
               />
 
-              {/* 
               <form.Field
-                name="host"
+                name="wsaddress"
                 children={(field) => {
                   return (
                     <label className="form-control w-full">
                       <div className="label">
-                        <span className="label-text">host</span>
+                        <span className="label-text">WebSocket Address</span>
                       </div>
                       <input
                         className="input input-bordered w-full"
@@ -158,6 +151,7 @@ function RootComponent() {
                   );
                 }}
               />
+              {/* 
               <form.Field
                 name="port"
                 children={(field) => {
@@ -178,9 +172,13 @@ function RootComponent() {
                 }}
               /> */}
 
-              <button type="submit" className="btn btn-primary w-full mt-4">
+              <button
+                type="submit"
+                className="btn btn-primary w-full mt-4"
+                disabled={connectionStatus === "Connecting"}
+              >
                 {connectionStatus === "Connecting" && <span>Connecting...</span>}
-                {connectionStatus === "Open" && <span>Update</span>}
+                update
               </button>
             </form>
           )}

@@ -1,12 +1,9 @@
-import {
-  DrawingUtils,
-  FilesetResolver,
-  ObjectDetector,
-  type ObjectDetectorResult,
-} from "@mediapipe/tasks-vision";
+import { DrawingUtils, type ObjectDetectorResult } from "@mediapipe/tasks-vision";
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useCallback, useEffect } from "react";
 import { z } from "zod";
+
+import type { OutgoingMessage } from "@/workers/objectDetect";
 
 import type { UYVYFrame } from "../libs/webgl";
 
@@ -21,56 +18,18 @@ const searchParam = z.object({
 export const Route = createFileRoute("/objectDetect")({
   component: RouteComponent,
   validateSearch: searchParam,
-  loaderDeps: ({ search }) => {
-    return {
-      maxResults: search.maxResults,
-      scoreThreshold: search.scoreThreshold,
-    };
-  },
-  loader: async (ctx) => {
-    const appRoot = new URL(import.meta.env.DEV ? "../../" : "./", self.location.href);
-    const wasmPath = new URL("models/mediapipe/wasm/", appRoot);
-    const modelPath = new URL(
-      "models/mediapipe/object_detector/efficientdet_lite0.tflite",
-      appRoot,
-    );
-    const vision = await FilesetResolver.forVisionTasks(wasmPath.href);
-
-    const model = await ObjectDetector.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath: modelPath.href,
-        delegate: "GPU",
-      },
-      runningMode: "VIDEO",
-      maxResults: ctx.deps.maxResults,
-      scoreThreshold: ctx.deps.scoreThreshold,
-    });
-
-    return {
-      model,
-    };
-  },
 });
 
 function RouteComponent() {
-  const { model } = Route.useLoaderData();
-  const { username } = Route.useSearch();
-
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const drawingUtilsRef = useRef<DrawingUtils | null>(null);
+  const { username, maxResults, scoreThreshold } = Route.useSearch();
   const {
     websocket: { sendMessage, getWebSocket },
   } = Route.useRouteContext();
 
-  const ws = getWebSocket() as WebSocket;
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const workerRef = useRef<Worker | null>(null);
 
-  const detect = useCallback(
-    (source: TexImageSource, timestamp: number) => {
-      const result = model.detectForVideo(source, timestamp);
-      return result;
-    },
-    [model],
-  );
+  const ws = getWebSocket() as WebSocket;
 
   const drawDetections = useCallback((result: ObjectDetectorResult, drawingUtils: DrawingUtils) => {
     if (result.detections) {
@@ -107,11 +66,16 @@ function RouteComponent() {
   const handleCameraFrame = useCallback(
     (video: HTMLVideoElement, seq: number, uyvyFrame: UYVYFrame) => {
       const canvas = canvasRef.current;
+      const worker = workerRef.current;
       const ctx = canvas?.getContext("2d");
-      const drawingUtils = drawingUtilsRef.current;
-      if (!ctx || !canvas || !drawingUtils) return;
+      if (!ctx || !canvas || !worker) return;
       if (canvas.width !== video.videoWidth) canvas.width = video.videoWidth;
       if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight;
+
+      createImageBitmap(video).then((imageBitmap) => {
+        worker.postMessage({ type: "frame", data: imageBitmap, seq }, [imageBitmap]);
+        imageBitmap.close();
+      });
 
       const camPacket = writeJitterMatrixArrayBuffer(
         `${username}_camera`,
@@ -125,43 +89,49 @@ function RouteComponent() {
       if (ws.bufferedAmount < 1024 * 1024) {
         sendMessage(camPacket, false);
       }
-
-      const result = detect(video, seq);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawDetections(result, drawingUtils);
-
-      if (result.detections.length === 0) return;
-
-      const numOfDetection = result.detections.length;
-      const data = detectorResultToFloat32Array(result);
-
-      const message = writeJitterMatrixArrayBuffer(
-        `${username}_bbox`,
-        4,
-        "float32",
-        1,
-        numOfDetection,
-        data,
-      );
-
-      // console.log("ws.bufferedAmount", ws.bufferedAmount);
-      if (ws.bufferedAmount < 1024 * 1024) {
-        sendMessage(message, false);
-      }
     },
-    [detect, drawDetections, username, sendMessage, ws],
+    [username, sendMessage, ws],
   );
 
   useEffect(() => {
+    const url = new URL("../workers/objectDetect.ts", import.meta.url);
+    url.searchParams.set("scoreThreshold", scoreThreshold.toString());
+    url.searchParams.set("maxResults", maxResults.toString());
+
+    const worker = new Worker(url, {
+      type: "module",
+    });
+    workerRef.current = worker;
+
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!ctx || !canvas) return;
-    drawingUtilsRef.current = new DrawingUtils(ctx);
+    const drawingUtils = new DrawingUtils(ctx);
+
+    worker.onmessage = (event: OutgoingMessage) => {
+      if (event.data.type === "ready") {
+        console.log("Worker is ready");
+      } else if (event.data.type === "result") {
+        const { result } = event.data;
+        const numOfDetection = result.detections.length;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawDetections(result, drawingUtils);
+        if (numOfDetection === 0) return;
+        const data = detectorResultToFloat32Array(result);
+
+        if (ws.bufferedAmount < 1024 * 1024) {
+          sendMessage(
+            writeJitterMatrixArrayBuffer(`${username}_bbox`, 4, "float32", 1, numOfDetection, data),
+            false,
+          );
+        }
+      }
+    };
 
     return () => {
-      drawingUtilsRef.current = null;
+      worker.terminate();
     };
-  }, []);
+  }, [drawDetections, username, sendMessage, ws, maxResults, scoreThreshold]);
 
   return (
     <div className="relative flex h-full w-full bg-black">

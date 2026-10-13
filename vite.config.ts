@@ -5,6 +5,7 @@ import basicSsl from "@vitejs/plugin-basic-ssl";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
+import tsconfigPaths from "vite-tsconfig-paths";
 
 import websocketServer from "./wsserver.ts";
 
@@ -34,6 +35,7 @@ export default defineConfig({
       autoCodeSplitting: true,
     }),
     react(),
+    tsconfigPaths(),
     babel({ presets: [reactCompilerPreset()] }),
     websocketPlugin(),
     viteSingleFile({}),

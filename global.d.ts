@@ -38,6 +38,7 @@ interface Max {
     callback: (args: JitterMatrix & StreamingMetadata) => void,
     opts?: StreamingOptions,
   ): void;
+  getJitterMatrix(name: string, callback: (matrix: JitterMatrix | null) => void): void;
   setJitterMatrix(name: string, matrix: JitterMatrix): void;
   setDict(name: string, dict: MaxDict): void;
   setJitterMatrix(name: string, matrix: JitterMatrix): void;
