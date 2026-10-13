@@ -25,6 +25,7 @@ function websocketPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: process.env.BASE_URL || "/",
   server: {
     host: true,
   },
