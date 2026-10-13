@@ -27,6 +27,7 @@ declare class JitterMatrix {
 }
 
 declare const outlet: (index: number, ...args: unknown[]) => void;
+declare const outlet_dictionary: (index: number, dict: Record<string, unknown>) => void;
 
 declare class Global {
   constructor(name: string);

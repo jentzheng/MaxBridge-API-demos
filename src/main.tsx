@@ -7,7 +7,6 @@ import { routeTree } from "./routeTree.gen";
 import "./styles.css";
 
 const hashHistory = createHashHistory();
-// const history = createHistory();
 
 const router = createRouter({
   routeTree,
@@ -27,7 +26,20 @@ const rootElement = document.getElementById("root")!;
 
 export function App() {
   const wsAddress = router.latestLocation.search.wsaddress!;
-  const websocket = useWebSocket(wsAddress);
+  const username = router.latestLocation.search.username!;
+  const websocket = useWebSocket(
+    wsAddress,
+    {
+      onOpen: () => {
+        websocket.sendJsonMessage({ type: "setUser", username });
+      },
+      onClose: () => {
+        websocket.sendJsonMessage({ type: "removeUser", username });
+      },
+    },
+    !window.max,
+  );
+
   return <RouterProvider router={router} context={{ websocket }} />;
 }
 

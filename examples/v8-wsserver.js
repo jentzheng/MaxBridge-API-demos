@@ -1,17 +1,37 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 outlets = 1;
-outlettypes = ["jit_matrix"];
-const wss = new WebSocketServer({ port: 8081, host: "127.0.0.1" });
-const matrix = new JitterMatrix();
-const decoder = new TextDecoder();
+// outlettypes = ["dictionary"];
+const wss = new WebSocketServer({ port: 8081, host: "0.0.0.0" });
 const typeMap = new Map([
     [0, "char"],
     [1, "long"],
     [2, "float32"],
     [3, "float64"],
 ]);
+const matrix = new JitterMatrix();
+const decoder = new TextDecoder();
+const users = new Set();
+function getUsers() {
+    outlet_dictionary(0, { users: Array.from(users).map(({ username }) => username) });
+}
+function randomUUID() {
+    return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER).toString(36);
+}
+randomUUID.local = 1;
+function broadcastUsers() {
+    users.forEach(({ socket }) => {
+        socket.send(JSON.stringify({ type: "users", users: Array.from(users) }));
+    });
+}
 wss.on("connection", (socket) => {
+    const user = {
+        id: randomUUID(),
+        username: "",
+        socket,
+    };
+    users.add(user);
+    broadcastUsers();
     socket.onmessage = (event) => {
         if (event.data instanceof Uint8Array) {
             const data = event.data; // IOBuffer
@@ -48,11 +68,24 @@ wss.on("connection", (socket) => {
             }
         }
         else {
-            console.log("Received non-Uint8Array message:", event.data);
-            if (typeof event.data !== "string") {
-                return;
+            if (typeof event.data === "string") {
+                const message = JSON.parse(event.data);
+                if (message.type === "setUser") {
+                    // check if the username is already taken
+                    if (Array.from(users).some(({ username }) => username === message.username)) {
+                        socket.close();
+                        return;
+                    }
+                    user.username = message.username;
+                    broadcastUsers();
+                }
             }
         }
+    };
+    socket.onclose = () => {
+        console.log("WebSocket connection closed");
+        users.delete(user);
+        broadcastUsers();
     };
 });
 wss.on("close", () => {

@@ -32,14 +32,14 @@ export default defineConfig({
     format: "es",
   },
   plugins: [
-    tailwindcss(),
+    tsconfigPaths(),
     tanstackRouter({
       target: "react",
       autoCodeSplitting: true,
     }),
     react(),
-    tsconfigPaths(),
     babel({ presets: [reactCompilerPreset()] }),
+    tailwindcss(),
     websocketPlugin(),
     viteSingleFile({}),
     process.env.SELF_SIGN_SSL === "true" && basicSsl(),

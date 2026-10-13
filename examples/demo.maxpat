@@ -9,13 +9,33 @@
             "modernui": 1
         },
         "classnamespace": "box",
-        "rect": [ 89.0, 96.0, 1197.0, 987.0 ],
+        "rect": [ 89.0, 96.0, 1185.0, 987.0 ],
         "gridonopen": 2,
         "gridsize": [ 8.0, 8.0 ],
         "gridsnaponopen": 2,
         "objectsnaponopen": 0,
         "subpatcher_template": "snap_to_grid_template",
         "boxes": [
+            {
+                "box": {
+                    "id": "obj-5",
+                    "maxclass": "message",
+                    "numinlets": 2,
+                    "numoutlets": 1,
+                    "outlettype": [ "" ],
+                    "patching_rect": [ 656.0, 24.0, 72.0, 22.0 ],
+                    "text": "getUsers"
+                }
+            },
+            {
+                "box": {
+                    "id": "obj-11",
+                    "maxclass": "dict.view",
+                    "numinlets": 1,
+                    "numoutlets": 0,
+                    "patching_rect": [ 976.0, 16.0, 200.0, 120.0 ]
+                }
+            },
             {
                 "box": {
                     "depthbuffer": 1,
@@ -75,7 +95,7 @@
             },
             {
                 "box": {
-                    "code": "rect(scale, pos) {\n    uv = norm;\n    x = (uv.x >= pos.x) && (uv.x < pos.x + scale.x);\n    y = (uv.y >= pos.y) && (uv.y < pos.y + scale.y);\n    return x && y;\n}\r\nParam bboxDim(0,0);\r\npicIn = in1;\r\nposIn = in2;\r\nbinSize = 1 / bboxDim.y;\r\nframeWidth = 0.01 * vec(dim.y/dim.x, 1);\r\nframeCol = vec(1,0,0);\r\npicOut = picIn;\r\nmask=0;\r\nfor(i=0; i<bboxDim.y; i+=1){\r\n  samplePos = (i*binSize) + (binSize*0.5);\r\n  bbox = nearest(posIn, samplePos);\r\n  pos = bbox.ar / dim;\n  wh = bbox.gb / dim;\r\n  mask += rect(wh, pos);\r\n  picOut = mix(picIn, picIn*mask, 0.8);\r\n}\r\nout1 = picOut;",
+                    "code": "// Inspired by Wellenfront Max Lab\r\n// https://www.youtube.com/watch?v=gXgibHnIt-U\r\nrect(scale, pos) {\n    uv = norm;\n    x = (uv.x >= pos.x) && (uv.x < pos.x + scale.x);\n    y = (uv.y >= pos.y) && (uv.y < pos.y + scale.y);\n    return x && y;\n}\r\n\r\nParam bboxDim(0,0);\r\npicIn = in1;\r\nposIn = in2;\r\nbinSize = 1 / bboxDim.y;\r\nframeWidth = 0.01 * vec(dim.y/dim.x, 1);\r\nframeCol = vec(1,0,0);\r\npicOut = picIn;\r\nmask=0;\r\nfor(i=0; i<bboxDim.y; i+=1){\r\n  samplePos = (i*binSize) + (binSize*0.5);\r\n  bbox = nearest(posIn, samplePos);\r\n  pos = bbox.ar / dim;\n  wh = bbox.gb / dim;\r\n  mask += rect(wh, pos);\r\n  picOut = mix(picIn, picIn*mask, 0.8);\r\n}\r\nout1 = picOut;",
                     "fontface": 0,
                     "fontname": "<Monospaced>",
                     "fontsize": 12.0,
@@ -590,8 +610,8 @@
                     "maxclass": "newobj",
                     "numinlets": 1,
                     "numoutlets": 1,
-                    "outlettype": [ "jit_matrix" ],
-                    "patching_rect": [ 752.0, 80.0, 101.0, 22.0 ],
+                    "outlettype": [ "" ],
+                    "patching_rect": [ 752.0, 24.0, 101.0, 22.0 ],
                     "saved_object_attributes": {
                         "embed": 0,
                         "parameter_enable": 0
@@ -628,7 +648,7 @@
                     "numinlets": 1,
                     "numoutlets": 2,
                     "outlettype": [ "jit_gl_texture", "" ],
-                    "patching_rect": [ 200.0, 544.0, 128.0, 104.0 ],
+                    "patching_rect": [ 200.0, 544.0, 128.0, 112.0 ],
                     "pwinoutlettype": 1,
                     "stereo": 0,
                     "sync": 0
@@ -748,9 +768,9 @@
                                 "filename": "blading.mov",
                                 "filekind": "moviefile",
                                 "id": "u341004321",
-                                "loop": 0,
+                                "loop": 1,
                                 "content_state": {
-                                    "loop": 0
+                                    "loop": 1
                                 }
                             },
                             {
@@ -1057,6 +1077,12 @@
             },
             {
                 "patchline": {
+                    "destination": [ "obj-11", 0 ],
+                    "source": [ "obj-24", 0 ]
+                }
+            },
+            {
+                "patchline": {
                     "destination": [ "obj-12", 0 ],
                     "order": 0,
                     "source": [ "obj-25", 0 ]
@@ -1150,6 +1176,12 @@
                     "destination": [ "obj-54", 0 ],
                     "order": 0,
                     "source": [ "obj-49", 0 ]
+                }
+            },
+            {
+                "patchline": {
+                    "destination": [ "obj-24", 0 ],
+                    "source": [ "obj-5", 0 ]
                 }
             },
             {
