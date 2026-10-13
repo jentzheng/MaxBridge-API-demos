@@ -5,6 +5,8 @@ import { z } from "zod";
 
 import type { OutgoingMessage } from "@/workers/objectDetect";
 
+import workerUrl from "@/workers/objectDetect?worker&url";
+
 import type { UYVYFrame } from "../libs/webgl";
 
 import Camera from "../components/Camera";
@@ -29,7 +31,7 @@ function RouteComponent() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const workerRef = useRef<Worker | null>(null);
 
-  const ws = getWebSocket() as WebSocket;
+  const ws = getWebSocket();
 
   const drawDetections = useCallback((result: ObjectDetectorResult, drawingUtils: DrawingUtils) => {
     if (result.detections) {
@@ -77,28 +79,27 @@ function RouteComponent() {
         imageBitmap.close();
       });
 
-      const camPacket = writeJitterMatrixArrayBuffer(
-        `${username}_camera`,
-        4,
-        "char",
-        uyvyFrame.width,
-        uyvyFrame.height,
-        uyvyFrame.data,
+      sendMessage(
+        writeJitterMatrixArrayBuffer(
+          `${username}_camera`,
+          4,
+          "char",
+          uyvyFrame.width,
+          uyvyFrame.height,
+          uyvyFrame.data,
+        ),
+        false,
       );
-
-      if (ws.bufferedAmount < 1024 * 1024) {
-        sendMessage(camPacket, false);
-      }
     },
-    [username, sendMessage, ws],
+    [username, sendMessage],
   );
 
   useEffect(() => {
-    const url = new URL("../workers/objectDetect.ts", import.meta.url);
-    url.searchParams.set("scoreThreshold", scoreThreshold.toString());
-    url.searchParams.set("maxResults", maxResults.toString());
+    const workerUrlWithParams = new URL(workerUrl, import.meta.url);
+    workerUrlWithParams.searchParams.set("scoreThreshold", scoreThreshold.toString());
+    workerUrlWithParams.searchParams.set("maxResults", maxResults.toString());
 
-    const worker = new Worker(url, {
+    const worker = new Worker(workerUrlWithParams, {
       type: "module",
     });
     workerRef.current = worker;
@@ -110,7 +111,7 @@ function RouteComponent() {
 
     worker.onmessage = (event: OutgoingMessage) => {
       if (event.data.type === "ready") {
-        console.log("Worker is ready");
+        console.log("[from worker]:Worker is ready");
       } else if (event.data.type === "result") {
         const { result } = event.data;
         const numOfDetection = result.detections.length;
@@ -119,12 +120,10 @@ function RouteComponent() {
         if (numOfDetection === 0) return;
         const data = detectorResultToFloat32Array(result);
 
-        if (ws.bufferedAmount < 1024 * 1024) {
-          sendMessage(
-            writeJitterMatrixArrayBuffer(`${username}_bbox`, 4, "float32", 1, numOfDetection, data),
-            false,
-          );
-        }
+        sendMessage(
+          writeJitterMatrixArrayBuffer(`${username}_bbox`, 4, "float32", 1, numOfDetection, data),
+          false,
+        );
       }
     };
 

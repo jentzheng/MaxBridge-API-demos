@@ -8,6 +8,7 @@ import type { OutgoingMessage } from "@/workers/faceLandmark";
 
 import Camera from "@/components/Camera";
 import { writeJitterMatrixArrayBuffer } from "@/libs/bufferHelper";
+import workerUrl from "@/workers/faceLandmark?worker&url";
 
 const searchParam = z.object({
   numFaces: z.number().default(3),
@@ -70,9 +71,8 @@ function Home() {
   };
 
   useEffect(() => {
-    const url = new URL("../workers/faceLandmark.ts", import.meta.url);
+    const url = new URL(workerUrl, import.meta.url);
     url.searchParams.set("numFaces", searchParams.numFaces.toString());
-
     const worker = new Worker(url, {
       type: "module",
     });
