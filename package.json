@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:max": "tsc -p tsconfig.max.json --watch",
-    "build": "tsc -b && cross-env BASE_URL=myrepo vite build",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "preview:https": "cross-env SELF_SIGN_SSL=true vite preview "
