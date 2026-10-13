@@ -11,7 +11,7 @@ const hashHistory = createHashHistory();
 
 const router = createRouter({
   routeTree,
-  // history: hashHistory,
+  history: hashHistory,
   context: {
     websocket: undefined!,
   },
