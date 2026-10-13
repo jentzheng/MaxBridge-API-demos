@@ -3,7 +3,8 @@ import { FaceLandmarker, FilesetResolver, type NormalizedLandmark } from "@media
 const urlParams = new URLSearchParams(self.location.search);
 const numFaces = parseInt(urlParams.get("numFaces") || "3");
 
-const appRoot = new URL(import.meta.env.DEV ? "../../" : "./", self.location.href);
+const appRoot = new URL(import.meta.env.BASE_URL, import.meta.url);
+
 const wasmPath = new URL("models/mediapipe/wasm/", appRoot);
 const modelPath = new URL(
   "models/mediapipe/face_landmarker/float16/1/face_landmarker.task",
