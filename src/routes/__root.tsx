@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form";
-import { Link, Outlet, createRootRouteWithContext } from "@tanstack/react-router";
+import { Link, Outlet, createRootRouteWithContext, useLocation } from "@tanstack/react-router";
 import { ReadyState } from "react-use-websocket";
 import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { z } from "zod";
@@ -22,7 +22,9 @@ export const Route = createRootRouteWithContext<{
 function RootComponent() {
   const { websocket } = Route.useRouteContext();
   const searchParams = Route.useSearch();
+  const location = useLocation();
   const navigate = Route.useNavigate();
+
   const { getWebSocket } = websocket;
   const ws = getWebSocket();
   const readyState = ws?.readyState || 0;
@@ -44,9 +46,13 @@ function RootComponent() {
     },
     onSubmit: async ({ value }) => {
       // Do something with form data
+
       navigate({
+        to: location.pathname,
         search: (prev) => ({ ...prev, username: value.username, wsaddress: value.wsaddress }),
-        reloadDocument: true,
+        replace: true,
+      }).then(() => {
+        window.location.reload();
       });
     },
   });
@@ -81,13 +87,43 @@ function RootComponent() {
           <div className="px-4">MaxBridge Demos</div>
           <ul className="menu menu-horizontal px-1">
             <li>
-              <Link to="/">CamOnly</Link>
+              <Link
+                to="/"
+                search={() => {
+                  return {
+                    username: searchParams.username,
+                    wsaddress: searchParams.wsaddress,
+                  };
+                }}
+              >
+                CamOnly
+              </Link>
             </li>
             <li>
-              <Link to="/faceLandmark">FaceLandmark</Link>
+              <Link
+                to="/faceLandmark"
+                search={() => {
+                  return {
+                    username: searchParams.username,
+                    wsaddress: searchParams.wsaddress,
+                  };
+                }}
+              >
+                FaceLandmark
+              </Link>
             </li>
             <li>
-              <Link to="/objectDetect">ObjectDetector</Link>
+              <Link
+                to="/objectDetect"
+                search={() => {
+                  return {
+                    username: searchParams.username,
+                    wsaddress: searchParams.wsaddress,
+                  };
+                }}
+              >
+                ObjectDetector
+              </Link>
             </li>
           </ul>
         </nav>
