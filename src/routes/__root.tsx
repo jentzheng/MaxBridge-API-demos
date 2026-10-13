@@ -1,6 +1,6 @@
 import { useForm } from "@tanstack/react-form";
 import { Link, Outlet, createRootRouteWithContext, useLocation } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ReadyState } from "react-use-websocket";
 import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { z } from "zod";
@@ -22,7 +22,7 @@ export const Route = createRootRouteWithContext<{
 
 function RootComponent() {
   const { websocket } = Route.useRouteContext();
-  const { readyState, getWebSocket } = websocket;
+  const { getWebSocket } = websocket;
   const searchParams = Route.useSearch();
   const location = useLocation();
   const navigate = Route.useNavigate();
@@ -46,26 +46,36 @@ function RootComponent() {
       });
     },
   });
-  const [connectionStatus, setConnectionStatus] = useState("");
   const [users, setUsers] = useState<{ id: string; username: string }[]>([]);
+
+  const connectionStatus = useMemo(() => {
+    const ws = getWebSocket();
+    if (!ws) return "";
+
+    return {
+      [ReadyState.CONNECTING]: "Connecting",
+      [ReadyState.OPEN]: "Open",
+      [ReadyState.CLOSING]: "Closing",
+      [ReadyState.CLOSED]: "Closed",
+      [ReadyState.UNINSTANTIATED]: "Uninstantiated",
+    }[ws?.readyState];
+  }, [getWebSocket]);
 
   useEffect(() => {
     const ws = getWebSocket();
     if (!ws) return;
+    console.log("WebSocket readyState inside useEffect:", ws.readyState);
+
     ws.onmessage = (event) => {
-      console.log("[root]WebSocket message received:", event.data);
       const data = JSON.parse(event.data);
       if (data.type === "users") {
         setUsers(data.users);
       }
     };
-
     return () => {
       ws.onmessage = null;
     };
   }, [getWebSocket]);
-
-  console.log("WebSocket readyState:", readyState);
 
   return (
     <div className="drawer lg:drawer-open justify-stretch ">
@@ -150,83 +160,62 @@ function RootComponent() {
           {!window.max && (
             <>
               <form
-                className="gap-4 flex flex-col"
                 onSubmit={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   form.handleSubmit();
                 }}
               >
-                <div>WebSocket Status: {connectionStatus}</div>
+                <fieldset className="fieldset bg-base-200 border-base-300 rounded-box   border p-2">
+                  <legend className="fieldset-legend">WebSocket Status {connectionStatus}</legend>
 
-                <form.Field
-                  name="username"
-                  children={(field) => {
-                    return (
-                      <label className="form-control w-full">
-                        <div className="label">
-                          <span className="label-text">username</span>
-                        </div>
-                        <input
-                          className="input input-bordered w-full"
-                          name={field.name}
-                          type="text"
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                        />
-                      </label>
-                    );
-                  }}
-                />
-
-                <form.Field
-                  name="wsaddress"
-                  children={(field) => {
-                    return (
-                      <label className="form-control w-full">
-                        <div className="label">
-                          <span className="label-text">WebSocket Address</span>
-                        </div>
-                        <input
-                          className="input input-bordered w-full"
-                          name={field.name}
-                          type="text"
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                        />
-                      </label>
-                    );
-                  }}
-                />
-                {/* 
-              <form.Field
-                name="port"
-                children={(field) => {
-                  return (
-                    <label className="form-control w-full">
-                      <div className="label">
-                        <span className="label-text">port</span>
-                      </div>
-                      <input
-                        className="input input-bordered w-full"
-                        name={field.name}
-                        type="text"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(Number(e.target.value))}
-                      />
-                    </label>
-                  );
-                }}
-              /> */}
-
-                <button
-                  type="submit"
-                  className="btn btn-primary w-full mt-4"
-                  disabled={connectionStatus === "Connecting"}
-                >
-                  {connectionStatus === "Connecting" && <span>Connecting...</span>}
-                  update
-                </button>
+                  <form.Field
+                    name="username"
+                    children={(field) => {
+                      return (
+                        <label className="form-control w-full">
+                          <div className="label">
+                            <span className="label-text">username</span>
+                          </div>
+                          <input
+                            className="input input-bordered w-full"
+                            name={field.name}
+                            type="text"
+                            value={field.state.value}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                          />
+                        </label>
+                      );
+                    }}
+                  />
+                  <form.Field
+                    name="wsaddress"
+                    children={(field) => {
+                      return (
+                        <label className="form-control w-full">
+                          <div className="label">
+                            <span className="label-text">WebSocket Address</span>
+                          </div>
+                          <input
+                            className="input input-bordered w-full"
+                            name={field.name}
+                            type="text"
+                            value={field.state.value}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                          />
+                        </label>
+                      );
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    className="btn btn-primary w-full mt-4"
+                    disabled={connectionStatus === "Connecting"}
+                  >
+                    {connectionStatus === "Connecting" && <span>Connecting...</span>}
+                    update
+                  </button>
+                </fieldset>
               </form>
               <div className="mt-4">
                 <h2 className="text-lg font-bold">Connected Users</h2>

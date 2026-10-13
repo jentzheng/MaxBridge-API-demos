@@ -41,7 +41,7 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
     websocketPlugin(),
-    viteSingleFile({}),
+    process.env.SINGLE_FILE === "true" && viteSingleFile({}),
     process.env.SELF_SIGN_SSL === "true" && basicSsl(),
   ],
 });

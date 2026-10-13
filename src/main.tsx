@@ -1,7 +1,7 @@
 import { RouterProvider, createRouter, createHashHistory } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
+import * as reactUseWebsocket from "react-use-websocket";
 
 import { routeTree } from "./routeTree.gen";
 import "./styles.css";
@@ -27,6 +27,10 @@ const rootElement = document.getElementById("root")!;
 export function App() {
   const wsAddress = router.latestLocation.search.wsaddress!;
   const username = router.latestLocation.search.username!;
+  // @ts-ignore
+  // @ts-expect-error
+  const useWebSocket = reactUseWebsocket.default.default;
+
   const websocket = useWebSocket(
     wsAddress,
     {
