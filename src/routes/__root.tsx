@@ -1,8 +1,9 @@
+import type useWebSocket from "react-use-websocket";
+
 import { useForm } from "@tanstack/react-form";
 import { Link, Outlet, createRootRouteWithContext, useLocation } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ReadyState } from "react-use-websocket";
-import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { z } from "zod";
 
 const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -52,15 +53,13 @@ function RootComponent() {
   const [users, setUsers] = useState<string[]>([]);
 
   const connectionStatus = useMemo(() => {
-    const ws = getWebSocket();
-    if (!ws) return "";
     return {
       [ReadyState.CONNECTING]: "Connecting",
       [ReadyState.OPEN]: "Open",
       [ReadyState.CLOSING]: "Closing",
       [ReadyState.CLOSED]: "Closed",
       [ReadyState.UNINSTANTIATED]: "Uninstantiated",
-    }[ws?.readyState];
+    }[getWebSocket()?.readyState || ReadyState.UNINSTANTIATED];
   }, [getWebSocket]);
 
   useEffect(() => {
@@ -69,16 +68,11 @@ function RootComponent() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-
       if (data.type === "users") {
         setUsers(data.users);
       }
     };
-
-    return () => {
-      ws.onmessage = null;
-    };
-  }, [getWebSocket, connectionStatus]);
+  }, [getWebSocket]);
 
   return (
     <div className="drawer min-h-dvh lg:drawer-open justify-stretch ">
@@ -215,8 +209,7 @@ function RootComponent() {
                     className="btn btn-primary w-full mt-4"
                     disabled={connectionStatus === "Connecting"}
                   >
-                    {connectionStatus === "Connecting" && <span>Connecting...</span>}
-                    update
+                    Refresh
                   </button>
                 </fieldset>
               </form>
