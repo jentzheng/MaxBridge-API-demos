@@ -247,9 +247,9 @@ export default function CameraComponent({ onFrame }: Props) {
           />
         )} */}
 
-        <div className="flex w-full flex-wrap justify-center gap-2">
+        <div className="flex w-full flex-wrap justify-center gap-1">
           <select
-            className="select select-sm w-auto max-w-56"
+            className="select select-xs w-auto max-w-56"
             value={selectedDeviceId ?? ""}
             onChange={(e) => switchDevice(e.target.value)}
           >
@@ -261,7 +261,7 @@ export default function CameraComponent({ onFrame }: Props) {
           </select>
 
           <select
-            className="select select-sm w-auto"
+            className="select select-xs w-auto"
             value={resolutionIdx}
             onChange={(e) => changeResolution(Number(e.target.value))}
           >
@@ -273,7 +273,7 @@ export default function CameraComponent({ onFrame }: Props) {
           </select>
 
           <button
-            className="btn btn-sm btn-warning"
+            className="btn btn-xs btn-warning"
             onClick={() => setIsPlaying((playing) => !playing)}
           >
             {isPlaying ? "Stop" : "Start"}

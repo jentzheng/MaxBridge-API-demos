@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback } from "react";
+import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 
 import type { UYVYFrame } from "@/libs/webgl";
 
@@ -12,8 +13,10 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const searchParams = Route.useSearch();
-  const { websocket } = Route.useRouteContext();
-  const { sendMessage } = websocket;
+  const { sendMessage } = useWebSocket(searchParams.wsaddress, {
+    share: true,
+    queryParams: { username: searchParams.username, role: "sender" },
+  });
 
   const handleCameraFrame = useCallback(
     (video: HTMLVideoElement, seq: number, uyvyFrame: UYVYFrame) => {
@@ -25,7 +28,7 @@ function Home() {
         uyvyFrame.height,
         uyvyFrame.data,
       );
-      sendMessage(camPacket);
+      sendMessage(camPacket, false);
     },
     [sendMessage, searchParams.username],
   );

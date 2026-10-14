@@ -1,16 +1,15 @@
 import { DrawingUtils, type ObjectDetectorResult } from "@mediapipe/tasks-vision";
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useCallback, useEffect } from "react";
+import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { z } from "zod";
 
+import type { UYVYFrame } from "@/libs/webgl";
 import type { OutgoingMessage } from "@/workers/objectDetect";
 
+import Camera from "@/components/Camera";
+import { writeJitterMatrixArrayBuffer } from "@/libs/bufferHelper";
 import workerUrl from "@/workers/objectDetect?worker&url";
-
-import type { UYVYFrame } from "../libs/webgl";
-
-import Camera from "../components/Camera";
-import { writeJitterMatrixArrayBuffer } from "../libs/bufferHelper";
 
 const searchParam = z.object({
   maxResults: z.number().min(1).max(100).default(5),
@@ -23,15 +22,14 @@ export const Route = createFileRoute("/objectDetect")({
 });
 
 function RouteComponent() {
-  const { username, maxResults, scoreThreshold } = Route.useSearch();
-  const {
-    websocket: { sendMessage, getWebSocket },
-  } = Route.useRouteContext();
+  const searchParams = Route.useSearch();
+  const { sendMessage } = useWebSocket(searchParams.wsaddress, {
+    share: true,
+    queryParams: { username: searchParams.username, role: "sender" },
+  });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const workerRef = useRef<Worker | null>(null);
-
-  const ws = getWebSocket();
 
   const drawDetections = useCallback((result: ObjectDetectorResult, drawingUtils: DrawingUtils) => {
     if (result.detections) {
@@ -81,7 +79,7 @@ function RouteComponent() {
 
       sendMessage(
         writeJitterMatrixArrayBuffer(
-          `${username}_camera`,
+          `${searchParams.username}_camera`,
           4,
           "char",
           uyvyFrame.width,
@@ -91,13 +89,13 @@ function RouteComponent() {
         false,
       );
     },
-    [username, sendMessage],
+    [searchParams, sendMessage],
   );
 
   useEffect(() => {
     const workerUrlWithParams = new URL(workerUrl, import.meta.url);
-    workerUrlWithParams.searchParams.set("scoreThreshold", scoreThreshold.toString());
-    workerUrlWithParams.searchParams.set("maxResults", maxResults.toString());
+    workerUrlWithParams.searchParams.set("scoreThreshold", searchParams.scoreThreshold.toString());
+    workerUrlWithParams.searchParams.set("maxResults", searchParams.maxResults.toString());
 
     const worker = new Worker(workerUrlWithParams, {
       type: "module",
@@ -120,17 +118,50 @@ function RouteComponent() {
         if (numOfDetection === 0) return;
         const data = detectorResultToFloat32Array(result);
 
+        window.max?.setJitterMatrix("bbox", {
+          type: "float32",
+          planecount: 4,
+          dim: [1, numOfDetection],
+          data,
+        });
+
         sendMessage(
-          writeJitterMatrixArrayBuffer(`${username}_bbox`, 4, "float32", 1, numOfDetection, data),
+          writeJitterMatrixArrayBuffer(
+            `${searchParams.username}_bbox`,
+            4,
+            "float32",
+            1,
+            numOfDetection,
+            data,
+          ),
           false,
         );
       }
     };
 
+    if (window.max) {
+      window.max.bindJitterImage(
+        async (image) => {
+          if (canvas.width !== image.width) canvas.width = image.width;
+          if (canvas.height !== image.height) canvas.height = image.height;
+          const imageData = new ImageData(image.data, image.width, image.height);
+          worker.postMessage({ type: "frame", seq: image.timestamp, data: imageData });
+        },
+        { queue: 20, drop: "oldest" },
+      );
+    }
+
     return () => {
       worker.terminate();
     };
-  }, [drawDetections, username, sendMessage, ws, maxResults, scoreThreshold]);
+  }, [
+    drawDetections,
+    searchParams.username,
+    sendMessage,
+    searchParams.wsaddress,
+    searchParams.maxResults,
+    searchParams.scoreThreshold,
+  ]);
 
   return (
     <div className="relative flex h-full w-full bg-black">

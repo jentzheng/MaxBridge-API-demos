@@ -1,6 +1,7 @@
 import { DrawingUtils, FaceLandmarker, type NormalizedLandmark } from "@mediapipe/tasks-vision";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useCallback } from "react";
+import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { z } from "zod";
 
 import type { UYVYFrame } from "@/libs/webgl";
@@ -21,8 +22,10 @@ export const Route = createFileRoute("/faceLandmark")({
 
 function Home() {
   const searchParams = Route.useSearch();
-  const { websocket } = Route.useRouteContext();
-  const { sendMessage } = websocket;
+  const { sendMessage } = useWebSocket(searchParams.wsaddress, {
+    share: true,
+    queryParams: { username: searchParams.username, role: "sender" },
+  });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const workerRef = useRef<Worker | null>(null);
@@ -93,6 +96,7 @@ function Home() {
           const { numFaces, numMarks, planecount, data } = landmarkTofloat32Array(
             event.data.faceLandmarks,
           );
+
           window.max?.setJitterMatrix("face_landmarkmatrix", {
             type: "float32",
             planecount,
@@ -109,7 +113,6 @@ function Home() {
             data,
           );
           sendMessage(packet, false);
-
           drawLandmarks(event.data.faceLandmarks, drawingUtils);
         } else {
           window.max?.setJitterMatrix("face_landmarkmatrix", {

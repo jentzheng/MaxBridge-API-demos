@@ -67,12 +67,14 @@ socket.onmessage = (event) => {
     }
   } else if (typeof data === "string") {
     const message = JSON.parse(data) as JSONMessage;
-    options.users = message.users;
+    if (message.type === "users") {
+      options.users = message.users;
+    }
   }
 };
 
 type JSONMessage = {
-  type: string;
+  type: "users";
   users: string[];
 };
 

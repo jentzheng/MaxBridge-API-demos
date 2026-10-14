@@ -43,6 +43,9 @@ export default defineConfig({
     tailwindcss(),
     websocketPlugin(),
     process.env.SINGLE_FILE === "true" && viteSingleFile({}),
-    process.env.SELF_SIGN_SSL === "true" && basicSsl(),
+    process.env.SELF_SIGN_SSL === "true" &&
+      basicSsl({
+        certDir: "./tmp/certs",
+      }),
   ],
 });

@@ -1,9 +1,6 @@
-import type useWebSocketType from "react-use-websocket";
-
 import { RouterProvider, createRouter, createHashHistory } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import * as reactUseWebsocket from "react-use-websocket";
 
 import { routeTree } from "./routeTree.gen";
 import "./styles.css";
@@ -27,26 +24,7 @@ declare module "@tanstack/react-router" {
 const rootElement = document.getElementById("root")!;
 
 export function App() {
-  const wsAddress = router.latestLocation.search.wsaddress!;
-  const username = router.latestLocation.search.username!;
-  // @ts-ignore
-  // @ts-expect-error
-  const useWebSocket = reactUseWebsocket.default.default;
-  const websocket = useWebSocket(
-    wsAddress,
-    {
-      queryParams: { username, role: "sender" },
-      onOpen: () => {
-        websocket.sendJsonMessage({ type: "setUser", username });
-      },
-      onClose: () => {
-        websocket.sendJsonMessage({ type: "removeUser", username });
-      },
-    },
-    !window.max,
-  );
-
-  return <RouterProvider router={router} context={{ websocket }} />;
+  return <RouterProvider router={router} />;
 }
 
 const root = createRoot(rootElement);

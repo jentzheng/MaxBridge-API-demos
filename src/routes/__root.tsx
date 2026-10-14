@@ -1,9 +1,8 @@
-import type useWebSocket from "react-use-websocket";
-
 import { useForm } from "@tanstack/react-form";
-import { Link, Outlet, createRootRouteWithContext, useLocation } from "@tanstack/react-router";
+import { Link, Outlet, createRootRoute, useLocation } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ReadyState } from "react-use-websocket";
+import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { z } from "zod";
 
 const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -16,20 +15,48 @@ const searchParam = z.object({
   username: z.string().default("Guest"),
 });
 
-export const Route = createRootRouteWithContext<{
-  websocket: ReturnType<typeof useWebSocket>;
-}>()({
+export const Route = createRootRoute({
   component: RootComponent,
   // searchparams
   validateSearch: searchParam,
 });
 
 function RootComponent() {
-  const { websocket } = Route.useRouteContext();
-  const { getWebSocket, readyState } = websocket;
   const searchParams = Route.useSearch();
   const location = useLocation();
   const navigate = Route.useNavigate();
+
+  const { readyState, sendJsonMessage } = useWebSocket(
+    searchParams.wsaddress,
+    {
+      share: true,
+      queryParams: { username: searchParams.username, role: "sender" },
+      onOpen: () => {
+        // sendJsonMessage({ type: "setUser", username: searchParams.username });
+      },
+      onMessage: (event) => {
+        const data = JSON.parse(event.data);
+        console.log(data);
+        if (data.type === "users") {
+          setUsers(data.users);
+        }
+      },
+      onClose: () => {
+        // sendJsonMessage({ type: "removeUser", username: searchParams.username });
+      },
+    },
+    !window.max,
+  );
+
+  const connectionStatus = useMemo(() => {
+    return {
+      [ReadyState.CONNECTING]: "Connecting",
+      [ReadyState.OPEN]: "Open",
+      [ReadyState.CLOSING]: "Closing",
+      [ReadyState.CLOSED]: "Closed",
+      [ReadyState.UNINSTANTIATED]: "Uninstantiated",
+    }[readyState];
+  }, [readyState]);
 
   const form = useForm({
     defaultValues: {
@@ -52,27 +79,51 @@ function RootComponent() {
   });
   const [users, setUsers] = useState<string[]>([]);
 
-  const connectionStatus = useMemo(() => {
-    return {
-      [ReadyState.CONNECTING]: "Connecting",
-      [ReadyState.OPEN]: "Open",
-      [ReadyState.CLOSING]: "Closing",
-      [ReadyState.CLOSED]: "Closed",
-      [ReadyState.UNINSTANTIATED]: "Uninstantiated",
-    }[getWebSocket()?.readyState || ReadyState.UNINSTANTIATED];
-  }, [getWebSocket]);
-
-  useEffect(() => {
-    const ws = getWebSocket();
-    if (!ws) return;
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "users") {
-        setUsers(data.users);
-      }
-    };
-  }, [getWebSocket]);
+  const menu = ({ className }: { className?: string }) => {
+    return (
+      <ul className={className + "menu lg:flex px-1"}>
+        <li>
+          <Link
+            to="/"
+            search={() => {
+              return {
+                username: searchParams.username,
+                wsaddress: searchParams.wsaddress,
+              };
+            }}
+          >
+            CamOnly
+          </Link>
+        </li>
+        <li>
+          <Link
+            to="/faceLandmark"
+            search={() => {
+              return {
+                username: searchParams.username,
+                wsaddress: searchParams.wsaddress,
+              };
+            }}
+          >
+            FaceLandmark
+          </Link>
+        </li>
+        <li>
+          <Link
+            to="/objectDetect"
+            search={() => {
+              return {
+                username: searchParams.username,
+                wsaddress: searchParams.wsaddress,
+              };
+            }}
+          >
+            ObjectDetector
+          </Link>
+        </li>
+      </ul>
+    );
+  };
 
   return (
     <div className="drawer min-h-dvh lg:drawer-open justify-stretch ">
@@ -102,47 +153,7 @@ function RootComponent() {
             </svg>
           </label>
           <div className="px-4">MaxBridge Demos</div>
-          <ul className="menu menu-horizontal px-1">
-            <li>
-              <Link
-                to="/"
-                search={() => {
-                  return {
-                    username: searchParams.username,
-                    wsaddress: searchParams.wsaddress,
-                  };
-                }}
-              >
-                CamOnly
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/faceLandmark"
-                search={() => {
-                  return {
-                    username: searchParams.username,
-                    wsaddress: searchParams.wsaddress,
-                  };
-                }}
-              >
-                FaceLandmark
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/objectDetect"
-                search={() => {
-                  return {
-                    username: searchParams.username,
-                    wsaddress: searchParams.wsaddress,
-                  };
-                }}
-              >
-                ObjectDetector
-              </Link>
-            </li>
-          </ul>
+          {menu({ className: "menu lg:menu-horizontal menu-vertical hidden lg:flex px-1" })}
         </nav>
         {/* Page content here */}
         <main className="min-h-0 flex-1">
@@ -154,6 +165,7 @@ function RootComponent() {
         <label htmlFor="my-drawer" aria-label="close sidebar" className="drawer-overlay"></label>
         {/* Sidebar content here */}
         <div className="min-h-full max-w-xs bg-gray-800 p-4">
+          {menu({ className: "lg:hidden menu menu-vertical w-full px-1 " })}
           {!window.max && (
             <>
               <form

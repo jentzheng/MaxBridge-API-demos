@@ -32,24 +32,23 @@ export default function Server(httpServer: http.Server | Http2SecureServer) {
     }
     const client = { username, role, socket: ws };
     clientSet.add(client);
-
-    const users = Array.from(clientSet).map(({ username, role }) => `${username} - ${role}`);
-
-    clientSet.forEach(({ socket, username }) => {
+    clientSet.forEach(({ socket }) => {
       socket.send(
         JSON.stringify({
           type: "users",
-          users: users,
+          users: Array.from(clientSet).map(({ username, role }) => `${username} - ${role}`),
         }),
       );
-      console.log("sending users list to", username);
     });
 
     ws.on("message", (data, isBinary) => {
       if (data instanceof Buffer) {
         clientSet.forEach(({ socket: receiver, role: r }) => {
           if (r === "receiver") {
-            receiver.send(data, { binary: isBinary });
+            receiver.send(data, {
+              compress: true,
+              binary: isBinary,
+            });
           }
         });
       }
@@ -57,6 +56,15 @@ export default function Server(httpServer: http.Server | Http2SecureServer) {
 
     ws.on("close", () => {
       clientSet.delete(client);
+      clientSet.forEach(({ socket, username }) => {
+        socket.send(
+          JSON.stringify({
+            type: "users",
+            users: Array.from(clientSet).map(({ username, role }) => `${username} - ${role}`),
+          }),
+        );
+        console.log("sending users list to", username);
+      });
     });
   });
 

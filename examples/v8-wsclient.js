@@ -60,6 +60,8 @@ socket.onmessage = (event) => {
     }
     else if (typeof data === "string") {
         const message = JSON.parse(data);
-        options.users = message.users;
+        if (message.type === "users") {
+            options.users = message.users;
+        }
     }
 };
