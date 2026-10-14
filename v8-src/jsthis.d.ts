@@ -13,6 +13,7 @@ declare let outlets: number;
 declare let inlet: number;
 declare let messagename: string;
 declare let outlettypes: string[];
+declare const jsarguments: unknown[];
 
 declare class JitterMatrix {
   constructor(planecount?: number, dataType?: MaxMatrixType, columns?: number, rows?: number);

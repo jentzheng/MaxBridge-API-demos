@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:https": "cross-env SELF_SIGN_SSL=true vite",
     "dev:max": "tsc -p tsconfig.max.json --watch",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

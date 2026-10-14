@@ -136,7 +136,7 @@ function RouteComponent() {
     <div className="relative flex h-full w-full bg-black">
       <canvas
         ref={canvasRef}
-        className="absolute z-10 w-full h-full max-h-full max-w-full object-contain "
+        className="absolute z-1 w-full h-full max-h-full max-w-full object-contain "
       />
       {!window.max && <Camera onFrame={handleCameraFrame} />}
     </div>

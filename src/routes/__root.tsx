@@ -5,10 +5,13 @@ import { ReadyState } from "react-use-websocket";
 import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { z } from "zod";
 
+const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
+// const wsPort = Number(window.location.port);
+
 const searchParam = z.object({
   // host: z.string().default("localhost"),
   // port: z.number().default(5173),
-  wsaddress: z.string().default("ws://localhost:8081"),
+  wsaddress: z.string().default(`${wsProto}//${window.location.host}/ws`),
   username: z.string().default("Guest"),
 });
 
@@ -22,7 +25,7 @@ export const Route = createRootRouteWithContext<{
 
 function RootComponent() {
   const { websocket } = Route.useRouteContext();
-  const { getWebSocket } = websocket;
+  const { getWebSocket, readyState } = websocket;
   const searchParams = Route.useSearch();
   const location = useLocation();
   const navigate = Route.useNavigate();
@@ -46,12 +49,11 @@ function RootComponent() {
       });
     },
   });
-  const [users, setUsers] = useState<{ id: string; username: string }[]>([]);
+  const [users, setUsers] = useState<string[]>([]);
 
   const connectionStatus = useMemo(() => {
     const ws = getWebSocket();
     if (!ws) return "";
-
     return {
       [ReadyState.CONNECTING]: "Connecting",
       [ReadyState.OPEN]: "Open",
@@ -64,23 +66,24 @@ function RootComponent() {
   useEffect(() => {
     const ws = getWebSocket();
     if (!ws) return;
-    console.log("WebSocket readyState inside useEffect:", ws.readyState);
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+
       if (data.type === "users") {
         setUsers(data.users);
       }
     };
+
     return () => {
       ws.onmessage = null;
     };
-  }, [getWebSocket]);
+  }, [getWebSocket, connectionStatus]);
 
   return (
-    <div className="drawer lg:drawer-open justify-stretch ">
+    <div className="drawer min-h-dvh lg:drawer-open justify-stretch ">
       <input id="my-drawer" type="checkbox" className="drawer-toggle inline" />
-      <div className="drawer-content  h-dvh flex flex-col">
+      <div className="drawer-content h-full max-h-dvh flex flex-col">
         {/* Navbar */}
         <nav className="navbar w-full bg-base-300">
           <label
@@ -220,10 +223,8 @@ function RootComponent() {
               <div className="mt-4">
                 <h2 className="text-lg font-bold">Connected Users</h2>
                 <ul>
-                  {users.map((user) => (
-                    <li key={user.id}>
-                      {user.id} - {user.username}
-                    </li>
+                  {users.map((user, index) => (
+                    <li key={index}>{user}</li>
                   ))}
                 </ul>
               </div>

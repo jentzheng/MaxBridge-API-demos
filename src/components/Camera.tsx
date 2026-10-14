@@ -40,10 +40,15 @@ function useDevice() {
   const [error, setError] = useState<string | null>(null);
 
   const refreshDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError("Camera API is unavailable. Use HTTPS or localhost.");
+      return;
+    }
+
     try {
+      const mediaDevices = await navigator.mediaDevices.enumerateDevices();
       const permissionStatus = await navigator.permissions.query({ name: "camera" });
       setPermissionStatus(permissionStatus);
-      const mediaDevices = await navigator.mediaDevices.enumerateDevices();
       const audioInputs = mediaDevices.filter((d) => d.kind === "audioinput");
       const videoInputs = mediaDevices.filter((d) => d.kind === "videoinput");
       setAudioInputs(audioInputs);
@@ -56,27 +61,27 @@ function useDevice() {
   }, []);
 
   useEffect(() => {
-    const mediaDevices = navigator.mediaDevices;
-    if (!mediaDevices) {
-      console.warn("MediaDevices API not available");
-      return;
-    }
-
-    (async () => {
-      await refreshDevices();
-    })();
-
+    if (!navigator.mediaDevices) return;
     const handleDeviceChange = () => {
       console.log("Device change detected");
       refreshDevices();
     };
-
-    mediaDevices.addEventListener("devicechange", handleDeviceChange);
-
+    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
     return () => {
-      mediaDevices.removeEventListener("devicechange", handleDeviceChange);
+      navigator.mediaDevices.removeEventListener("devicechange", handleDeviceChange);
     };
   }, [refreshDevices]);
+
+  // useEffect(() => {
+  //   if (!permissionStatus) return;
+  //   const handlePermissionChange = () => {
+  //     console.log("Permission status changed", permissionStatus.state);
+  //   };
+  //   permissionStatus.addEventListener("change", handlePermissionChange);
+  //   return () => {
+  //     permissionStatus.removeEventListener("change", handlePermissionChange);
+  //   };
+  // }, [refreshDevices, permissionStatus]);
 
   return { permissionStatus, audioInputs, videoInputs, error, refreshDevices };
 }
@@ -85,22 +90,23 @@ export default function CameraComponent({ onFrame }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const frameRef = useRef<number>(-1);
   const trackRef = useRef<MediaStreamTrack | null>(null);
+  const [isPlaying, setIsPlaying] = useState(true);
 
-  const { audioInputs, videoInputs, permissionStatus, error } = useDevice();
+  const { audioInputs, videoInputs, permissionStatus, error, refreshDevices } = useDevice();
 
   const [resolutionIdx, setResolutionIdx] = useState(() => {
     const index = Number(localStorage.getItem(LOCAL_RES_KEY));
     return index ?? 2;
   });
 
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(() =>
-    localStorage.getItem(LOCAL_DEV_KEY),
-  );
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(() => {
+    return localStorage.getItem(LOCAL_DEV_KEY);
+  });
   // const [zoomRange, setZoomRange] = useState<ZoomRange | null>(null);
   // const [zoom, setZoom] = useState(1);
   // Get camera list
 
-  const switchDevice = useCallback((deviceId: string, constraints: MediaTrackConstraints) => {
+  const switchDevice = useCallback((deviceId: string) => {
     setSelectedDeviceId(deviceId);
     localStorage.setItem(LOCAL_DEV_KEY, deviceId);
   }, []);
@@ -113,45 +119,75 @@ export default function CameraComponent({ onFrame }: Props) {
   // Start camera
   // const testCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const startCamera = useCallback(
-    async (video: HTMLVideoElement, selectedDeviceId: string, resolutionIdx: number) => {
+    async (selectedDeviceId: string | null, resolutionIdx: number) => {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
-          deviceId: { exact: selectedDeviceId },
+          deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+          facingMode: "user",
           width: resolutions[resolutionIdx].width,
           height: resolutions[resolutionIdx].height,
         },
       });
-      const track = stream.getVideoTracks()[0];
-      trackRef.current = track;
-      video.srcObject = stream;
+
       return stream;
     },
     [],
   );
 
   useEffect(() => {
+    if (!isPlaying) return;
     const video = videoRef.current;
-    if (!video || !selectedDeviceId || !resolutionIdx) return;
-    const stream = startCamera(video, selectedDeviceId, resolutionIdx);
     const renderer = new WebGLRenderer();
+    if (!video) return;
 
+    let localStream: MediaStream | null = null;
+    let cancelled = false;
+
+    const init = async () => {
+      const stream = await startCamera(selectedDeviceId, resolutionIdx);
+      const videoTrack = stream.getVideoTracks()[0];
+      trackRef.current = videoTrack;
+      localStream = stream;
+      if (selectedDeviceId === null) {
+        const deviceId = videoTrack.getSettings().deviceId;
+        if (deviceId) {
+          setSelectedDeviceId(deviceId);
+          localStorage.setItem(LOCAL_DEV_KEY, deviceId);
+        }
+      }
+      refreshDevices();
+      if (cancelled) {
+        localStream?.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      video.srcObject = stream;
+      await video.play();
+      // setIsPlaying(true);
+    };
+    init();
+
+    let lastFrameTime = 0;
+    const FRAME_INTERVAL = 1000 / 30; // 30 FPS
     const loop = async (now: number, metadata: VideoFrameCallbackMetadata) => {
-      const uyvy = renderer.draw(video);
-      onFrame(video, now, uyvy);
+      const elapsed = now - lastFrameTime;
+      if (elapsed > FRAME_INTERVAL) {
+        lastFrameTime = now;
+        const uyvy = renderer.draw(video);
+        onFrame(video, now, uyvy);
+      }
       frameRef.current = video.requestVideoFrameCallback(loop);
     };
     frameRef.current = video.requestVideoFrameCallback(loop);
 
     return () => {
+      cancelled = true;
       video.cancelVideoFrameCallback(frameRef.current);
-      stream.then((s) =>
-        s.getTracks().forEach((track) => {
-          track.stop();
-        }),
-      );
+      localStream?.getTracks().forEach((track) => track.stop());
+      video.pause();
+      video.srcObject = null;
     };
-  }, [selectedDeviceId, resolutionIdx, startCamera, onFrame]);
+  }, [onFrame, selectedDeviceId, resolutionIdx, startCamera, refreshDevices, isPlaying]);
 
   // const changeZoom = useCallback((value: number) => {
   //   setZoom(value);
@@ -162,18 +198,31 @@ export default function CameraComponent({ onFrame }: Props) {
   // }, []);
 
   // const containerRef = useRef<HTMLDivElement | null>(null);
-  const fullscreen = useCallback(async () => {
-    if (document.fullscreenElement) {
-      await document.exitFullscreen();
-    } else {
-      // await containerRef.current?.requestFullscreen();
-    }
-  }, []);
+  // const fullscreen = useCallback(async () => {
+  //   const video = videoRef.current;
+  //   if (!video) return;
+
+  //   if ("webkitEnterFullscreen" in video) {
+  //     // @ts-ignore
+  //     video.webkitEnterFullscreen(); // for iOS Safari
+  //   }
+
+  //   if (video.requestFullscreen) {
+  //     video.requestFullscreen(); // Android, desktop
+  //   }
+
+  //   video.play();
+  // }, []);
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   return (
-    <div className="relative flex flex-col h-full w-full bg-black">
+    <div ref={containerRef} className="relative flex flex-col h-full w-full bg-black">
       {/* <canvas ref={testCanvasRef} className="absolute w-50 h-50 top-0 left-0 bg-amber-400" /> */}
 
+      {/* <p>
+        permissionStatus: {permissionStatus?.name} {permissionStatus?.state}
+      </p> */}
       {error && <p className=" bg-red-500 text-white p-2">{error}</p>}
 
       <video
@@ -184,7 +233,7 @@ export default function CameraComponent({ onFrame }: Props) {
         muted
       />
 
-      <div className="absolute z-20 bottom-0 left-0 w-full bg-black/40 p-2">
+      <div className="absolute z-2 bottom-0 left-0 w-full bg-black/40 p-2">
         {/* {zoomRange && (
           <input
             type="range"
@@ -202,7 +251,7 @@ export default function CameraComponent({ onFrame }: Props) {
           <select
             className="select select-sm w-auto max-w-56"
             value={selectedDeviceId ?? ""}
-            onChange={(e) => switchDevice(e.target.value, {})}
+            onChange={(e) => switchDevice(e.target.value)}
           >
             {videoInputs.map((device, index) => (
               <option key={device.deviceId} value={device.deviceId}>
@@ -223,13 +272,16 @@ export default function CameraComponent({ onFrame }: Props) {
             ))}
           </select>
 
-          <button className="btn btn-sm btn-warning" onClick={() => trackRef.current?.stop()}>
-            Stop
+          <button
+            className="btn btn-sm btn-warning"
+            onClick={() => setIsPlaying((playing) => !playing)}
+          >
+            {isPlaying ? "Stop" : "Start"}
           </button>
 
-          <button className="btn btn-sm" onClick={fullscreen}>
+          {/* <button className="btn btn-sm" onClick={fullscreen}>
             Fullscreen
-          </button>
+          </button> */}
         </div>
       </div>
     </div>

@@ -17,56 +17,51 @@ export default function Server(httpServer: http.Server | Http2SecureServer) {
     }
   });
 
-  const senderSocketMap = new Map<string, WebSocket>();
-  const receiverSocketMap = new Map<string, WebSocket>();
+  type Role = "sender" | "receiver";
+
+  const clientSet = new Set<{ username: string; role: Role; socket: WebSocket }>();
 
   wss.on("connection", (ws, req) => {
     const queryParams = url.parse(req.url!, true).query as { username?: string; role?: string };
+    const username = queryParams.username;
+    const role = queryParams.role as Role | undefined;
 
-    const user = queryParams.username;
-    const role = queryParams.role;
-    if (!user || !role) {
+    if (!username || !role) {
       ws.close(1008, "Username is required");
       return;
     }
+    const client = { username, role, socket: ws };
+    clientSet.add(client);
 
-    const hasSender = role === "sender";
-    const hasReceiver = role === "receiver";
+    const users = Array.from(clientSet).map(({ username, role }) => `${username} - ${role}`);
 
-    if (hasReceiver) {
-      console.log("Receiver connected:", user);
-      receiverSocketMap.get(user)?.close(1000, "Replaced by a new receiver");
-      receiverSocketMap.set(user, ws);
-    }
+    clientSet.forEach(({ socket, username }) => {
+      socket.send(
+        JSON.stringify({
+          type: "users",
+          users: users,
+        }),
+      );
+      console.log("sending users list to", username);
+    });
 
-    if (hasSender) {
-      console.log("Sender connected:", user);
-      senderSocketMap.get(user)?.close(1000, "Replaced by a new sender");
-      senderSocketMap.set(user, ws);
-
-      ws.on("message", (data, isBinary) => {
-        receiverSocketMap.forEach((receiver) => {
-          if (receiver !== ws && receiver.readyState === receiver.OPEN) {
+    ws.on("message", (data, isBinary) => {
+      if (data instanceof Buffer) {
+        clientSet.forEach(({ socket: receiver, role: r }) => {
+          if (r === "receiver") {
             receiver.send(data, { binary: isBinary });
           }
         });
-      });
-    }
+      }
+    });
 
     ws.on("close", () => {
-      if (senderSocketMap.get(user) === ws) {
-        senderSocketMap.delete(user);
-      }
-      if (receiverSocketMap.get(user) === ws) {
-        receiverSocketMap.delete(user);
-      }
-      console.log("Connection closed:", user);
+      clientSet.delete(client);
     });
   });
 
   wss.on("close", () => {
-    senderSocketMap.clear();
-    receiverSocketMap.clear();
+    clientSet.clear();
   });
 
   return wss;

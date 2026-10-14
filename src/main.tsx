@@ -1,3 +1,5 @@
+import type useWebSocketType from "react-use-websocket";
+
 import { RouterProvider, createRouter, createHashHistory } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -30,10 +32,10 @@ export function App() {
   // @ts-ignore
   // @ts-expect-error
   const useWebSocket = reactUseWebsocket.default.default;
-
   const websocket = useWebSocket(
     wsAddress,
     {
+      queryParams: { username, role: "sender" },
       onOpen: () => {
         websocket.sendJsonMessage({ type: "setUser", username });
       },
