@@ -1,0 +1,6 @@
+.agent
+node_modules
+dist
+*.log
+
+examples

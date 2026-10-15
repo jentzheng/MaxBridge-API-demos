@@ -9,9 +9,11 @@
     /* Bundler mode */
     "module": "nodenext",
     "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
-    "noEmit": true,
+    "noEmit": false,
+    "outDir": "./dist",
 
     /* Linting */
     // "noUnusedLocals": true,
@@ -19,5 +21,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "wsserver.ts"]
+  "include": ["vite.config.ts", "wsserver.ts", "server.ts"]
 }

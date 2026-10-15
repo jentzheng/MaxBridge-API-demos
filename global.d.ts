@@ -26,7 +26,7 @@ type StreamingMetadata = {
 
 type MaxDict = Record<string, number | string | MaxArray | MaxDict>;
 
-interface Max {
+type Max = {
   bindInlet(name: string, callback: (args?: any[]) => void): void;
   post(message: string): void;
   outlet(initial: number | string, ...args: (number | string)[] | undefined): void;
@@ -42,7 +42,7 @@ interface Max {
   setJitterMatrix(name: string, matrix: JitterMatrix): void;
   setDict(name: string, dict: MaxDict): void;
   setJitterMatrix(name: string, matrix: JitterMatrix): void;
-}
+};
 
 interface Window {
   max?: Max;
