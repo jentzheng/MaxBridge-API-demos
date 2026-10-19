@@ -13,7 +13,8 @@
     "noEmit": false,
 
     /* Linting */
-    "strict": true
+    "strict": true,
+    "types": ["maxmsp"]
   },
-  "include": ["./v8-src/*.ts", "jsthis.d.ts"]
+  "include": ["./v8-src/*.ts"]
 }

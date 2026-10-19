@@ -8,7 +8,7 @@ import type { UYVYFrame } from "@/libs/webgl";
 import type { OutgoingMessage } from "@/workers/faceLandmark";
 
 import Camera from "@/components/Camera";
-import { writeJitterMatrixArrayBuffer } from "@/libs/bufferHelper";
+import { writeJitMatBuffer } from "@/libs/bufferHelper";
 import workerUrl from "@/workers/faceLandmark?worker&url";
 
 const searchParam = z.object({
@@ -56,23 +56,6 @@ function Home() {
     [],
   );
 
-  const landmarkTofloat32Array = (faceLandmarks: NormalizedLandmark[][]) => {
-    const numFaces = faceLandmarks.length;
-    const numMarks = faceLandmarks[0]?.length || 0;
-    const planecount = 3;
-
-    const data = new Float32Array(numFaces * numMarks * planecount);
-    faceLandmarks.forEach((landmarks, faceIdx) => {
-      landmarks.forEach(({ x, y, z }, i) => {
-        const o = (faceIdx * numMarks + i) * planecount;
-        data[o] = x * 2 - 1;
-        data[o + 1] = -(y * 2 - 1);
-        data[o + 2] = z;
-      });
-    });
-    return { numFaces, numMarks, planecount, data };
-  };
-
   useEffect(() => {
     const url = new URL(workerUrl, import.meta.url);
     url.searchParams.set("numFaces", searchParams.numFaces.toString());
@@ -87,68 +70,41 @@ function Home() {
     const drawingUtils = new DrawingUtils(ctx);
 
     worker.onmessage = (event: OutgoingMessage) => {
-      if (event.data.type === "ready") {
-        console.log("Worker is ready");
-      } else if (event.data.type === "result") {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        if (event.data.faceLandmarks.length > 0) {
-          const { numFaces, numMarks, planecount, data } = landmarkTofloat32Array(
-            event.data.faceLandmarks,
-          );
-
-          window.max?.setJitterMatrix("face_landmarkmatrix", {
-            type: "float32",
-            planecount,
-            dim: [numMarks, numFaces],
-            data,
-          });
-
-          const packet = writeJitterMatrixArrayBuffer(
+      switch (event.data.type) {
+        case "ready": {
+          console.log("Worker is ready");
+          break;
+        }
+        case "result": {
+          const numFaces = event.data.faceLandmarks.length;
+          const numMarks = event.data.faceLandmarks[0]?.length || 0;
+          const planecount = 3;
+          const packet = writeJitMatBuffer(
             `${searchParams.username}_facelandmarks`,
             planecount,
             "float32",
             numMarks,
             numFaces,
-            data,
+            Float32Array.from(
+              event.data.faceLandmarks.flatMap((landmarks) =>
+                landmarks.flatMap(({ x, y, z }) => [x, y, z]),
+              ),
+            ),
           );
           sendMessage(packet, false);
-          drawLandmarks(event.data.faceLandmarks, drawingUtils);
-        } else {
-          window.max?.setJitterMatrix("face_landmarkmatrix", {
-            type: "float32",
-            planecount: 3,
-            dim: [1, 1],
-            data: new Float32Array(3),
-          });
 
-          sendMessage(
-            writeJitterMatrixArrayBuffer(
-              `${searchParams.username}_facelandmarks`,
-              3,
-              "float32",
-              1,
-              1,
-              new Float32Array(3),
-            ),
-            false,
-          );
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          if (numFaces === 0) {
+            return;
+          }
+          drawLandmarks(event.data.faceLandmarks, drawingUtils);
+          break;
         }
-        window.max?.outlet("update");
+        default: {
+          break;
+        }
       }
     };
-
-    if (window.max) {
-      window.max.bindJitterImage(
-        async (image) => {
-          if (canvas.width !== image.width) canvas.width = image.width;
-          if (canvas.height !== image.height) canvas.height = image.height;
-          const imageData = new ImageData(image.data, image.width, image.height);
-          worker.postMessage({ type: "frame", seq: image.timestamp, data: imageData });
-        },
-        { queue: 20, drop: "oldest" },
-      );
-    }
 
     return () => {
       worker.terminate();
@@ -169,7 +125,7 @@ function Home() {
         imageBitmap.close();
       });
 
-      const camPacket = writeJitterMatrixArrayBuffer(
+      const camPacket = writeJitMatBuffer(
         `${searchParams.username}_camera`,
         4,
         "char",

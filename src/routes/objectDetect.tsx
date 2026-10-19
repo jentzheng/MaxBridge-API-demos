@@ -8,7 +8,7 @@ import type { UYVYFrame } from "@/libs/webgl";
 import type { OutgoingMessage } from "@/workers/objectDetect";
 
 import Camera from "@/components/Camera";
-import { writeJitterMatrixArrayBuffer } from "@/libs/bufferHelper";
+import { writeJitMatBuffer } from "@/libs/bufferHelper";
 import workerUrl from "@/workers/objectDetect?worker&url";
 
 const searchParam = z.object({
@@ -45,24 +45,6 @@ function RouteComponent() {
     }
   }, []);
 
-  const detectorResultToFloat32Array = (result: ObjectDetectorResult) => {
-    const numOfDetection = result.detections.length;
-    const planecount = 4; //xywh
-    const data = new Float32Array(numOfDetection * planecount);
-    result.detections.forEach((detection, boxIdx) => {
-      const offset = boxIdx * planecount;
-      if (detection.boundingBox) {
-        const { originX, originY, width, height } = detection.boundingBox;
-        data[offset] = originX;
-        data[offset + 1] = originY;
-        data[offset + 2] = width;
-        data[offset + 3] = height;
-      }
-    });
-
-    return data;
-  };
-
   const handleCameraFrame = useCallback(
     (video: HTMLVideoElement, seq: number, uyvyFrame: UYVYFrame) => {
       const canvas = canvasRef.current;
@@ -78,7 +60,7 @@ function RouteComponent() {
       });
 
       sendMessage(
-        writeJitterMatrixArrayBuffer(
+        writeJitMatBuffer(
           `${searchParams.username}_camera`,
           4,
           "char",
@@ -96,60 +78,61 @@ function RouteComponent() {
     const workerUrlWithParams = new URL(workerUrl, import.meta.url);
     workerUrlWithParams.searchParams.set("scoreThreshold", searchParams.scoreThreshold.toString());
     workerUrlWithParams.searchParams.set("maxResults", searchParams.maxResults.toString());
-
     const worker = new Worker(workerUrlWithParams, {
       type: "module",
     });
     workerRef.current = worker;
-
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!ctx || !canvas) return;
     const drawingUtils = new DrawingUtils(ctx);
-
     worker.onmessage = (event: OutgoingMessage) => {
-      if (event.data.type === "ready") {
-        console.log("[from worker]:Worker is ready");
-      } else if (event.data.type === "result") {
-        const { result } = event.data;
-        const numOfDetection = result.detections.length;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawDetections(result, drawingUtils);
-        if (numOfDetection === 0) return;
-        const data = detectorResultToFloat32Array(result);
+      switch (event.data.type) {
+        case "ready": {
+          console.log("[from worker]:Worker is ready");
+          break;
+        }
+        case "result": {
+          const { result } = event.data;
+          const numOfDetection = result.detections.length;
+          const data = Float32Array.from(
+            event.data.result.detections.flatMap((detection) => {
+              if (!detection.boundingBox) return [0, 0, 0, 0, 0];
 
-        window.max?.setJitterMatrix("bbox", {
-          type: "float32",
-          planecount: 4,
-          dim: [1, numOfDetection],
-          data,
-        });
+              const score = detection.categories[0].score;
 
-        sendMessage(
-          writeJitterMatrixArrayBuffer(
-            `${searchParams.username}_bbox`,
-            4,
-            "float32",
-            1,
-            numOfDetection,
-            data,
-          ),
-          false,
-        );
+              const { originX, originY, width, height } = detection.boundingBox;
+              const xmin = originX / canvas.width;
+              const ymin = originY / canvas.height;
+              const xmax = (originX + width) / canvas.width;
+              const ymax = (originY + height) / canvas.height;
+              return [xmin, ymin, xmax - xmin, ymax - ymin, score];
+            }),
+          );
+          sendMessage(
+            writeJitMatBuffer(
+              `${searchParams.username}_bbox-xywh`,
+              5,
+              "float32",
+              numOfDetection,
+              1,
+              data,
+            ),
+            false,
+          );
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          if (numOfDetection === 0) {
+            return;
+          }
+          drawDetections(result, drawingUtils);
+          break;
+        }
+        default: {
+          break;
+        }
       }
     };
-
-    if (window.max) {
-      window.max.bindJitterImage(
-        async (image) => {
-          if (canvas.width !== image.width) canvas.width = image.width;
-          if (canvas.height !== image.height) canvas.height = image.height;
-          const imageData = new ImageData(image.data, image.width, image.height);
-          worker.postMessage({ type: "frame", seq: image.timestamp, data: imageData });
-        },
-        { queue: 20, drop: "oldest" },
-      );
-    }
 
     return () => {
       worker.terminate();

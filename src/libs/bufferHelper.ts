@@ -9,7 +9,7 @@ const typeMap = new Map<MatrixType, number>([
   ["float64", 3],
 ]);
 
-export function writeJitterMatrixArrayBuffer(
+export function writeJitMatBuffer(
   name: string,
   planecount: number,
   type: MatrixType,
@@ -47,34 +47,5 @@ export function writeJitterMatrixArrayBuffer(
   offset += 2;
 
   bytes.set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength), offset);
-
-  // bytes.set(data, offset);
-  return packet;
-}
-
-export function constructCameraBuffer(
-  usernameBytes: Uint8Array,
-  uyvyFrame: UYVYFrame,
-): ArrayBuffer {
-  const headerSize = 1 + usernameBytes.byteLength + 8;
-  const packet = new ArrayBuffer(headerSize + uyvyFrame.data.byteLength);
-  const view = new DataView(packet);
-  const bytes = new Uint8Array(packet);
-
-  let offset = 0;
-  // 1. Username length (1 byte)
-  view.setUint8(offset, usernameBytes.byteLength);
-  offset += 1;
-  // 2. Username (UTF-8 bytes)
-  bytes.set(usernameBytes, offset);
-  offset += usernameBytes.byteLength;
-  // 3. Width (4 bytes, big-endian)
-  view.setUint32(offset, uyvyFrame.width, false);
-  offset += 4;
-  // 4. Height (4 bytes, big-endian)
-  view.setUint32(offset, uyvyFrame.height, false);
-  offset += 4;
-
-  bytes.set(uyvyFrame.data, offset);
   return packet;
 }

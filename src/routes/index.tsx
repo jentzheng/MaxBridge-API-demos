@@ -5,7 +5,7 @@ import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import type { UYVYFrame } from "@/libs/webgl";
 
 import Camera from "@/components/Camera";
-import { writeJitterMatrixArrayBuffer } from "@/libs/bufferHelper";
+import { writeJitMatBuffer } from "@/libs/bufferHelper";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -20,7 +20,7 @@ function Home() {
 
   const handleCameraFrame = useCallback(
     (video: HTMLVideoElement, seq: number, uyvyFrame: UYVYFrame) => {
-      const camPacket = writeJitterMatrixArrayBuffer(
+      const camPacket = writeJitMatBuffer(
         `${searchParams.username}_camera`,
         4,
         "char",

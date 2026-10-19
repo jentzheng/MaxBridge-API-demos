@@ -11,6 +11,7 @@ const options = {
 function getUsers() {
     outlet_dictionary(0, { users: options.users });
 }
+getUsers.local = 0;
 const socket = new WebSocket(options.wsUrl);
 socket.onopen = () => {
     console.log("WebSocket connected");
@@ -31,6 +32,7 @@ socket.onmessage = (event) => {
         // 1. matrixName length
         const nameLen = view.getUint8(offset);
         offset += 1;
+        // @ts-expect-error 'data.slice' is deprecated
         const matrixName = decoder.decode(data.slice(offset, offset + nameLen));
         offset += nameLen;
         const planeCount = view.getUint8(offset);
@@ -51,10 +53,14 @@ socket.onmessage = (event) => {
         }
         if (type === "char") {
             const pixelData = new Uint8Array(pixelBytes.buffer);
+            if (pixelData.length === 0)
+                return;
             matrix.copyarraytomatrix(pixelData);
         }
         else if (type === "float32") {
             const pixelData = new Float32Array(pixelBytes.buffer);
+            if (pixelData.length === 0)
+                return;
             matrix.copyarraytomatrix(pixelData);
         }
     }

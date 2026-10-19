@@ -1,6 +1,6 @@
 import { useForm } from "@tanstack/react-form";
 import { Link, Outlet, createRootRoute, useLocation } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ReadyState } from "react-use-websocket";
 import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { z } from "zod";
@@ -26,23 +26,16 @@ function RootComponent() {
   const location = useLocation();
   const navigate = Route.useNavigate();
 
-  const { readyState, sendJsonMessage } = useWebSocket(
+  const { readyState } = useWebSocket(
     searchParams.wsaddress,
     {
       share: true,
       queryParams: { username: searchParams.username, role: "sender" },
-      onOpen: () => {
-        // sendJsonMessage({ type: "setUser", username: searchParams.username });
-      },
       onMessage: (event) => {
         const data = JSON.parse(event.data);
-        console.log(data);
         if (data.type === "users") {
           setUsers(data.users);
         }
-      },
-      onClose: () => {
-        // sendJsonMessage({ type: "removeUser", username: searchParams.username });
       },
     },
     !window.max,
