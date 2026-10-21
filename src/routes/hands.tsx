@@ -89,7 +89,7 @@ function RouteComponent() {
     };
   }, [searchParams, sendMessage]);
 
-  const handleCameraFrame = useCallback((video: VideoFrame, seq: number, uyvyFrame: UYVYFrame) => {
+  const handleCameraFrame = useCallback((video: VideoFrame, seq: number) => {
     const canvas = canvasRef.current;
     const worker = workerRef.current;
     const ctx = canvas?.getContext("2d");

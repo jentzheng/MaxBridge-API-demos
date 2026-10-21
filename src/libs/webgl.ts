@@ -109,9 +109,9 @@ export class WebGLRenderer {
 
   draw(frame: VideoFrame): UYVYFrame {
     const width = frame.displayWidth & ~1;
-    const height = frame.displayWidth;
+    const height = frame.displayHeight;
 
-    if (!width || !height) {
+    if (!width || !height || !this.canvas || !this.ctx) {
       return {
         width: 0,
         height: 0,

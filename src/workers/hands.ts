@@ -4,7 +4,7 @@ const numHands = parseInt(urlParams.get("numHands") || "3");
 
 // handle URL parameters
 
-const useLocalModel = Boolean(import.meta.env.VITE_USE_LOCAL_MODEL === "true");
+const useLocalModel = import.meta.env.VITE_USE_LOCAL_MODEL;
 
 const rootUrl = new URL(import.meta.env.BASE_URL, import.meta.url);
 const localWasmUrl = `${rootUrl.origin}/models/mediapipe/wasm`;
