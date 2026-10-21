@@ -79,3 +79,20 @@ async function processLatest() {
     }
   }
 }
+
+export type OutgoingMessage = MessageEvent<
+  | {
+      type: "ready";
+    }
+  | {
+      type: "result";
+      result: {
+        depth: {
+          data: Float32Array;
+          width: number;
+          height: number;
+          channels: number;
+        };
+      };
+    }
+>;
