@@ -10,12 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DepthRouteImport } from './routes/depth'
 import { Route as FaceLandmarkRouteImport } from './routes/faceLandmark'
+import { Route as HandsRouteImport } from './routes/hands'
 import { Route as ObjectDetectRouteImport } from './routes/objectDetect'
+import { Route as PadsRouteImport } from './routes/pads'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DepthRoute = DepthRouteImport.update({
+  id: '/depth',
+  path: '/depth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FaceLandmarkRoute = FaceLandmarkRouteImport.update({
@@ -23,40 +31,70 @@ const FaceLandmarkRoute = FaceLandmarkRouteImport.update({
   path: '/faceLandmark',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HandsRoute = HandsRouteImport.update({
+  id: '/hands',
+  path: '/hands',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ObjectDetectRoute = ObjectDetectRouteImport.update({
   id: '/objectDetect',
   path: '/objectDetect',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PadsRoute = PadsRouteImport.update({
+  id: '/pads',
+  path: '/pads',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/depth': typeof DepthRoute
   '/faceLandmark': typeof FaceLandmarkRoute
+  '/hands': typeof HandsRoute
   '/objectDetect': typeof ObjectDetectRoute
+  '/pads': typeof PadsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/depth': typeof DepthRoute
   '/faceLandmark': typeof FaceLandmarkRoute
+  '/hands': typeof HandsRoute
   '/objectDetect': typeof ObjectDetectRoute
+  '/pads': typeof PadsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/depth': typeof DepthRoute
   '/faceLandmark': typeof FaceLandmarkRoute
+  '/hands': typeof HandsRoute
   '/objectDetect': typeof ObjectDetectRoute
+  '/pads': typeof PadsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/faceLandmark' | '/objectDetect'
+  fullPaths:
+    '/' | '/depth' | '/faceLandmark' | '/hands' | '/objectDetect' | '/pads'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/faceLandmark' | '/objectDetect'
-  id: '__root__' | '/' | '/faceLandmark' | '/objectDetect'
+  to: '/' | '/depth' | '/faceLandmark' | '/hands' | '/objectDetect' | '/pads'
+  id:
+    | '__root__'
+    | '/'
+    | '/depth'
+    | '/faceLandmark'
+    | '/hands'
+    | '/objectDetect'
+    | '/pads'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DepthRoute: typeof DepthRoute
   FaceLandmarkRoute: typeof FaceLandmarkRoute
+  HandsRoute: typeof HandsRoute
   ObjectDetectRoute: typeof ObjectDetectRoute
+  PadsRoute: typeof PadsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -68,11 +106,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/depth': {
+      id: '/depth'
+      path: '/depth'
+      fullPath: '/depth'
+      preLoaderRoute: typeof DepthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/faceLandmark': {
       id: '/faceLandmark'
       path: '/faceLandmark'
       fullPath: '/faceLandmark'
       preLoaderRoute: typeof FaceLandmarkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hands': {
+      id: '/hands'
+      path: '/hands'
+      fullPath: '/hands'
+      preLoaderRoute: typeof HandsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/objectDetect': {
@@ -82,13 +134,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ObjectDetectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pads': {
+      id: '/pads'
+      path: '/pads'
+      fullPath: '/pads'
+      preLoaderRoute: typeof PadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DepthRoute: DepthRoute,
   FaceLandmarkRoute: FaceLandmarkRoute,
+  HandsRoute: HandsRoute,
   ObjectDetectRoute: ObjectDetectRoute,
+  PadsRoute: PadsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

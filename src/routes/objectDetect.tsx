@@ -4,7 +4,6 @@ import { useRef, useCallback, useEffect } from "react";
 import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { z } from "zod";
 
-import type { UYVYFrame } from "@/libs/webgl";
 import type { OutgoingMessage } from "@/workers/objectDetect";
 
 import Camera from "@/components/Camera";
@@ -45,34 +44,15 @@ function RouteComponent() {
     }
   }, []);
 
-  const handleCameraFrame = useCallback(
-    (video: HTMLVideoElement, seq: number, uyvyFrame: UYVYFrame) => {
-      const canvas = canvasRef.current;
-      const worker = workerRef.current;
-      const ctx = canvas?.getContext("2d");
-      if (!ctx || !canvas || !worker) return;
-      if (canvas.width !== video.videoWidth) canvas.width = video.videoWidth;
-      if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight;
-
-      createImageBitmap(video).then((imageBitmap) => {
-        worker.postMessage({ type: "frame", data: imageBitmap, seq }, [imageBitmap]);
-        imageBitmap.close();
-      });
-
-      sendMessage(
-        writeJitMatBuffer(
-          `${searchParams.username}_camera`,
-          4,
-          "char",
-          uyvyFrame.width,
-          uyvyFrame.height,
-          uyvyFrame.data,
-        ),
-        false,
-      );
-    },
-    [searchParams, sendMessage],
-  );
+  const handleCameraFrame = useCallback((video: VideoFrame, seq: number) => {
+    const canvas = canvasRef.current;
+    const worker = workerRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!ctx || !canvas || !worker) return;
+    if (canvas.width !== video.displayWidth) canvas.width = video.displayWidth;
+    if (canvas.height !== video.displayHeight) canvas.height = video.displayHeight;
+    worker.postMessage({ type: "frame", data: video, seq }, [video]);
+  }, []);
 
   useEffect(() => {
     const workerUrlWithParams = new URL(workerUrl, import.meta.url);
@@ -95,6 +75,7 @@ function RouteComponent() {
         case "result": {
           const { result } = event.data;
           const numOfDetection = result.detections.length;
+
           const data = Float32Array.from(
             event.data.result.detections.flatMap((detection) => {
               if (!detection.boundingBox) return [0, 0, 0, 0, 0];
@@ -152,7 +133,7 @@ function RouteComponent() {
         ref={canvasRef}
         className="absolute z-1 w-full h-full max-h-full max-w-full object-contain "
       />
-      {!window.max && <Camera onFrame={handleCameraFrame} />}
+      {!window.max && <Camera onFrame={handleCameraFrame} sendMessage={sendMessage} />}
     </div>
   );
 }

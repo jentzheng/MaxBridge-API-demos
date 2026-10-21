@@ -33,11 +33,11 @@ export type UYVYFrame = {
 };
 
 export class WebGLRenderer {
-  canvas: HTMLCanvasElement | OffscreenCanvas;
-  ctx: WebGLRenderingContext;
+  canvas: OffscreenCanvas | null;
+  ctx: WebGLRenderingContext | null;
 
-  constructor(canvas?: HTMLCanvasElement) {
-    const target = canvas ?? new OffscreenCanvas(640, 480);
+  constructor() {
+    const target = new OffscreenCanvas(640, 480);
     const gl: WebGLRenderingContext | null =
       target instanceof HTMLCanvasElement ? target.getContext("webgl") : target.getContext("webgl");
     if (!gl) throw new Error("WebGL not supported");
@@ -104,20 +104,14 @@ export class WebGLRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   }
 
-  destroy() {
-    this.ctx = null as any;
-    this.canvas = null as any;
-  }
-
   static vertexShaderSource = vertexShaderSource;
   static fragmentShaderSource = fragmentShaderSource;
 
-  draw(frame: HTMLVideoElement): UYVYFrame {
-    if (
-      frame.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
-      !frame.videoWidth ||
-      !frame.videoHeight
-    ) {
+  draw(frame: VideoFrame): UYVYFrame {
+    const width = frame.displayWidth & ~1;
+    const height = frame.displayWidth;
+
+    if (!width || !height) {
       return {
         width: 0,
         height: 0,
@@ -125,8 +119,6 @@ export class WebGLRenderer {
       };
     }
 
-    const width = frame.videoWidth & ~1;
-    const height = frame.videoHeight;
     const gl = this.ctx;
 
     this.canvas.width = width / 2;
@@ -137,8 +129,10 @@ export class WebGLRenderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, frame);
     gl.uniform1f(
       gl.getUniformLocation(gl.getParameter(gl.CURRENT_PROGRAM), "u_texel"),
-      1 / frame.videoWidth,
+      1 / frame.displayWidth,
     );
+
+    frame.close();
 
     const data = new Uint8Array(width * height * 2);
     // flip the Y axis to match WebGL's coordinate system
@@ -152,5 +146,11 @@ export class WebGLRenderer {
       width: width / 2,
       data,
     };
+  }
+
+  destroy() {
+    this.ctx?.getExtension("WEBGL_lose_context")?.loseContext();
+    this.canvas = null;
+    this.ctx = null;
   }
 }

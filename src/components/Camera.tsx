@@ -1,6 +1,11 @@
+import type { SendMessage } from "react-use-websocket";
+
+import { useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { WebGLRenderer, type UYVYFrame } from "../libs/webgl";
+import { writeJitMatBuffer } from "@/libs/bufferHelper";
+
+import { WebGLRenderer } from "../libs/webgl";
 
 const resolutions = [
   {
@@ -32,10 +37,6 @@ type ZoomRange = {
   min: number;
   max: number;
   step: number;
-};
-
-type Props = {
-  onFrame: (video: HTMLVideoElement, seq: number, uyvyFrame: UYVYFrame) => void;
 };
 
 function useDevice() {
@@ -91,7 +92,13 @@ function useDevice() {
   return { permissionStatus, audioInputs, videoInputs, error, refreshDevices };
 }
 
-export default function CameraComponent({ onFrame }: Props) {
+type Props = {
+  onFrame?: (videoFrame: VideoFrame, seq: number) => void;
+  sendMessage: SendMessage;
+};
+export default function CameraComponent({ onFrame, sendMessage }: Props) {
+  const searchParams = useSearch({ strict: false });
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const frameRef = useRef<number>(-1);
   const trackRef = useRef<MediaStreamTrack | null>(null);
@@ -143,8 +150,9 @@ export default function CameraComponent({ onFrame }: Props) {
   useEffect(() => {
     if (!isPlaying) return;
     const video = videoRef.current;
-    const renderer = new WebGLRenderer();
     if (!video) return;
+    if (!searchParams.username) return;
+    const renderer = new WebGLRenderer();
 
     let localStream: MediaStream | null = null;
     let cancelled = false;
@@ -168,18 +176,36 @@ export default function CameraComponent({ onFrame }: Props) {
       }
       video.srcObject = stream;
       await video.play();
-      // setIsPlaying(true);
     };
     init();
 
     let lastFrameTime = 0;
-    const FRAME_INTERVAL = 1000 / 30; // 30 FPS
-    const loop = async (now: number, metadata: VideoFrameCallbackMetadata) => {
+    const FRAME_INTERVAL = 1000 / 25; // 25 FPS
+    const loop = async (now: number, _metadata: VideoFrameCallbackMetadata) => {
       const elapsed = now - lastFrameTime;
       if (elapsed > FRAME_INTERVAL) {
         lastFrameTime = now;
-        const uyvy = renderer.draw(video);
-        onFrame(video, now, uyvy);
+        const videoFrame = new VideoFrame(video, {
+          timestamp: now,
+        });
+        const remoteFrame = videoFrame.clone();
+        const uyvy = renderer.draw(videoFrame);
+        const camPacket = writeJitMatBuffer(
+          `${searchParams.username}_camera`,
+          4,
+          "char",
+          uyvy.width,
+          uyvy.height,
+          uyvy.data,
+        );
+
+        if (onFrame) {
+          onFrame(remoteFrame, remoteFrame.timestamp);
+        } else {
+          remoteFrame.close();
+        }
+
+        sendMessage(camPacket, false);
       }
       frameRef.current = video.requestVideoFrameCallback(loop);
     };
@@ -191,8 +217,18 @@ export default function CameraComponent({ onFrame }: Props) {
       localStream?.getTracks().forEach((track) => track.stop());
       video.pause();
       video.srcObject = null;
+      renderer.destroy();
     };
-  }, [onFrame, selectedDeviceId, resolutionIdx, startCamera, refreshDevices, isPlaying]);
+  }, [
+    onFrame,
+    selectedDeviceId,
+    resolutionIdx,
+    startCamera,
+    refreshDevices,
+    isPlaying,
+    sendMessage,
+    searchParams,
+  ]);
 
   // const changeZoom = useCallback((value: number) => {
   //   setZoom(value);

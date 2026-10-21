@@ -69,5 +69,10 @@ socket.onmessage = (event) => {
         if (message.type === "users") {
             options.users = message.users;
         }
+        else if (message.type === "button") {
+            const [_, username, type, index] = message.value.split("/");
+            const msg = `${type}-${index}`;
+            patcher.getnamed(msg).message("bang");
+        }
     }
 };

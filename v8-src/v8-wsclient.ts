@@ -71,15 +71,25 @@ socket.onmessage = (event) => {
     }
   } else if (typeof data === "string") {
     const message = JSON.parse(data) as JSONMessage;
+
     if (message.type === "users") {
       options.users = message.users;
+    } else if (message.type === "button") {
+      const [_, username, type, index] = message.value.split("/");
+      const msg = `${type}-${index}`;
+      patcher.getnamed(msg).message("bang");
     }
   }
 };
 
-type JSONMessage = {
-  type: "users";
-  users: string[];
-};
+type JSONMessage =
+  | {
+      type: "users";
+      users: string[];
+    }
+  | {
+      type: "button";
+      value: string;
+    };
 
 export {};

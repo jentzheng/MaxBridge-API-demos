@@ -72,51 +72,32 @@ function RootComponent() {
   });
   const [users, setUsers] = useState<string[]>([]);
 
-  const menu = ({ className }: { className?: string }) => {
-    return (
-      <ul className={className + "menu lg:flex px-1"}>
-        <li>
-          <Link
-            to="/"
-            search={() => {
-              return {
-                username: searchParams.username,
-                wsaddress: searchParams.wsaddress,
-              };
-            }}
-          >
-            CamOnly
-          </Link>
-        </li>
-        <li>
-          <Link
-            to="/faceLandmark"
-            search={() => {
-              return {
-                username: searchParams.username,
-                wsaddress: searchParams.wsaddress,
-              };
-            }}
-          >
-            FaceLandmark
-          </Link>
-        </li>
-        <li>
-          <Link
-            to="/objectDetect"
-            search={() => {
-              return {
-                username: searchParams.username,
-                wsaddress: searchParams.wsaddress,
-              };
-            }}
-          >
-            ObjectDetector
-          </Link>
-        </li>
-      </ul>
-    );
-  };
+  const navLinks = [
+    {
+      to: "/",
+      label: "CamOnly",
+    },
+    {
+      to: "/faceLandmark",
+      label: "FaceLandmark",
+    },
+    {
+      to: "/objectDetect",
+      label: "ObjectDetector",
+    },
+    {
+      to: "/hands",
+      label: "Hands",
+    },
+    {
+      to: "/depth",
+      label: "Depth",
+    },
+    {
+      to: "/pads",
+      label: "Pads",
+    },
+  ];
 
   return (
     <div className="drawer min-h-dvh lg:drawer-open justify-stretch ">
@@ -146,7 +127,18 @@ function RootComponent() {
             </svg>
           </label>
           <div className="px-4">MaxBridge Demos</div>
-          {menu({ className: "menu lg:menu-horizontal menu-vertical hidden lg:flex px-1" })}
+          <ul className="menu lg:menu-horizontal menu-vertical hidden lg:flex px-1">
+            {navLinks.map((link) => (
+              <li key={link.to}>
+                <Link
+                  to={link.to}
+                  search={{ username: searchParams.username, wsaddress: searchParams.wsaddress }}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </nav>
         {/* Page content here */}
         <main className="min-h-0 flex-1">
@@ -158,7 +150,19 @@ function RootComponent() {
         <label htmlFor="my-drawer" aria-label="close sidebar" className="drawer-overlay"></label>
         {/* Sidebar content here */}
         <div className="min-h-full max-w-xs bg-gray-800 p-4">
-          {menu({ className: "lg:hidden menu menu-vertical w-full px-1 " })}
+          <ul className="lg:hidden menu menu-vertical w-full px-1">
+            {navLinks.map((link) => (
+              <li key={link.to}>
+                <Link
+                  to={link.to}
+                  search={{ username: searchParams.username, wsaddress: searchParams.wsaddress }}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+
           {!window.max && (
             <>
               <form
