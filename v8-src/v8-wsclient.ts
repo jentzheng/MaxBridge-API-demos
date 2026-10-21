@@ -1,5 +1,5 @@
-outlets = 1;
-outlettypes = ["dictionary"];
+outlets = 2;
+outlettypes = ["jit_matrix", "dictionary"];
 
 const options = {
   wsUrl:
@@ -10,7 +10,7 @@ const options = {
 };
 
 function getUsers() {
-  outlet_dictionary(0, { users: options.users });
+  outlet_dictionary(1, { users: options.users });
 }
 getUsers.local = 0;
 
@@ -62,13 +62,13 @@ socket.onmessage = (event) => {
     }
     if (type === "char") {
       const pixelData = new Uint8Array(pixelBytes.buffer);
-      if (pixelData.length === 0) return;
       matrix.copyarraytomatrix(pixelData);
     } else if (type === "float32") {
       const pixelData = new Float32Array(pixelBytes.buffer);
-      if (pixelData.length === 0) return;
       matrix.copyarraytomatrix(pixelData);
     }
+
+    outlet(0, "jit_matrix", matrix.name);
   } else if (typeof data === "string") {
     const message = JSON.parse(data) as JSONMessage;
 

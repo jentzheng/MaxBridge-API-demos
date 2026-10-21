@@ -35,10 +35,20 @@ type IncomingMessage = MessageEvent<{
   seq: number;
 }>;
 
+let latestId = 0;
+
 self.onmessage = async (event: IncomingMessage) => {
   if (event.data.type === "frame") {
+    if (event.data.seq <= latestId) {
+      console.warn(`[FaceLandmarkWorker] Dropping out-of-order frame: ${event.data.seq}`);
+      event.data.data.close();
+      return;
+    }
+    latestId = event.data.seq;
+
     const { faceLandmarks } = model.detectForVideo(event.data.data, event.data.seq);
     event.data.data.close();
+
     self.postMessage({ type: "result", faceLandmarks: faceLandmarks });
   }
 };

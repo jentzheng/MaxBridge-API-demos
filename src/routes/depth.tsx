@@ -28,9 +28,6 @@ function RouteComponent() {
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx || !worker) return;
 
-    if (canvas.width !== video.displayWidth) canvas.width = video.displayWidth;
-    if (canvas.height !== video.displayHeight) canvas.height = video.displayHeight;
-
     worker.postMessage({ type: "frame", data: video, seq }, [video]);
   }, []);
 
@@ -55,8 +52,8 @@ function RouteComponent() {
           depth.data,
         );
         sendMessage(packet, false);
-        // if (canvas.width !== depth.width) canvas.width = depth.width;
-        // if (canvas.height !== depth.height) canvas.height = depth.height;
+        if (canvas.width !== depth.width) canvas.width = depth.width;
+        if (canvas.height !== depth.height) canvas.height = depth.height;
         const imageData = ctx.createImageData(depth.width, depth.height);
         const src = depth.data;
         const dst = imageData.data;
@@ -79,10 +76,10 @@ function RouteComponent() {
   }, [searchParams, sendMessage]);
 
   return (
-    <div className="relative flex h-full w-full bg-black">
+    <div className="relative   h-full w-full bg-black">
       <canvas
         ref={canvasRef}
-        className="absolute z-1 w-full h-full max-h-full max-w-full object-contain "
+        className="pointer-events-none absolute inset-0 z-1 h-full w-full object-contain"
       />
       {!window.max && <Camera onFrame={handleCameraFrame} sendMessage={sendMessage} />}
     </div>

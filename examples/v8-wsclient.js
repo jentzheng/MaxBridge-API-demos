@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-outlets = 1;
-outlettypes = ["dictionary"];
+outlets = 2;
+outlettypes = ["jit_matrix", "dictionary"];
 const options = {
     wsUrl: jsarguments.length > 1
         ? jsarguments[1]
@@ -9,7 +9,7 @@ const options = {
     users: [],
 };
 function getUsers() {
-    outlet_dictionary(0, { users: options.users });
+    outlet_dictionary(1, { users: options.users });
 }
 getUsers.local = 0;
 const socket = new WebSocket(options.wsUrl);
@@ -53,16 +53,13 @@ socket.onmessage = (event) => {
         }
         if (type === "char") {
             const pixelData = new Uint8Array(pixelBytes.buffer);
-            if (pixelData.length === 0)
-                return;
             matrix.copyarraytomatrix(pixelData);
         }
         else if (type === "float32") {
             const pixelData = new Float32Array(pixelBytes.buffer);
-            if (pixelData.length === 0)
-                return;
             matrix.copyarraytomatrix(pixelData);
         }
+        outlet(0, "jit_matrix", matrix.name);
     }
     else if (typeof data === "string") {
         const message = JSON.parse(data);
