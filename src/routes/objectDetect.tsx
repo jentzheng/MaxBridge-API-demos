@@ -8,7 +8,7 @@ import type { OutgoingMessage } from "@/workers/objectDetect";
 
 import Camera from "@/components/Camera";
 import { writeJitMatBuffer } from "@/libs/bufferHelper";
-import workerUrl from "@/workers/objectDetect?worker&url";
+import Worker from "@/workers/objectDetect?worker";
 
 const searchParam = z.object({
   maxResults: z.number().min(1).max(100).default(5),
@@ -29,6 +29,7 @@ function RouteComponent() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const workerRef = useRef<Worker | null>(null);
+  const isModelReady = useRef(false);
 
   const drawDetections = useCallback((result: ObjectDetectorResult, drawingUtils: DrawingUtils) => {
     if (result.detections) {
@@ -44,40 +45,30 @@ function RouteComponent() {
     }
   }, []);
 
-  const handleCameraFrame = useCallback((video: VideoFrame, seq: number) => {
-    const canvas = canvasRef.current;
-    const worker = workerRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!ctx || !canvas || !worker) return;
-    if (canvas.width !== video.displayWidth) canvas.width = video.displayWidth;
-    if (canvas.height !== video.displayHeight) canvas.height = video.displayHeight;
-    worker.postMessage({ type: "frame", data: video, seq }, [video]);
-  }, []);
-
   useEffect(() => {
-    const workerUrlWithParams = new URL(workerUrl, import.meta.url);
-    workerUrlWithParams.searchParams.set("scoreThreshold", searchParams.scoreThreshold.toString());
-    workerUrlWithParams.searchParams.set("maxResults", searchParams.maxResults.toString());
-    const worker = new Worker(workerUrlWithParams, {
-      type: "module",
-    });
+    const worker = new Worker();
     workerRef.current = worker;
+    worker.postMessage({
+      type: "INIT",
+      maxResults: searchParams.maxResults,
+      scoreThreshold: searchParams.scoreThreshold,
+    });
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!ctx || !canvas) return;
     const drawingUtils = new DrawingUtils(ctx);
-    worker.onmessage = (event: OutgoingMessage) => {
-      switch (event.data.type) {
-        case "ready": {
-          console.log("[from worker]:Worker is ready");
+    worker.onmessage = ({ data }: OutgoingMessage) => {
+      switch (data.type) {
+        case "READY": {
+          isModelReady.current = true;
           break;
         }
-        case "result": {
-          const { result } = event.data;
+        case "RESULT": {
+          const { result } = data;
           const numOfDetection = result.detections.length;
 
-          const data = Float32Array.from(
-            event.data.result.detections.flatMap((detection) => {
+          const bboxes = Float32Array.from(
+            result.detections.flatMap((detection) => {
               if (!detection.boundingBox) return [0, 0, 0, 0, 0];
 
               const score = detection.categories[0].score;
@@ -97,15 +88,12 @@ function RouteComponent() {
               "float32",
               numOfDetection,
               1,
-              data,
+              bboxes,
             ),
             false,
           );
 
           ctx.clearRect(0, 0, canvas.width, canvas.height);
-          if (numOfDetection === 0) {
-            return;
-          }
           drawDetections(result, drawingUtils);
           break;
         }
@@ -126,6 +114,20 @@ function RouteComponent() {
     searchParams.maxResults,
     searchParams.scoreThreshold,
   ]);
+
+  const handleCameraFrame = useCallback((frame: VideoFrame, seq: number) => {
+    const canvas = canvasRef.current;
+    const worker = workerRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!ctx || !canvas || !worker) return;
+    if (canvas.width !== frame.displayWidth) canvas.width = frame.displayWidth;
+    if (canvas.height !== frame.displayHeight) canvas.height = frame.displayHeight;
+    if (!isModelReady.current) {
+      frame.close();
+      return;
+    }
+    worker.postMessage({ type: "FRAME", frame, seq }, [frame]);
+  }, []);
 
   return (
     <div className="relative flex h-full w-full bg-black">

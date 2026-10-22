@@ -2948,7 +2948,7 @@
                     "maxclass": "newobj",
                     "numinlets": 1,
                     "numoutlets": 2,
-                    "outlettype": [ "jit_matrix", "" ],
+                    "outlettype": [ "", "jit_matrix" ],
                     "patching_rect": [ 16.0, 240.0, 184.0, 49.0 ],
                     "saved_object_attributes": {
                         "embed": 0,
@@ -3054,12 +3054,6 @@
                 "patchline": {
                     "destination": [ "obj-1", 0 ],
                     "source": [ "obj-26", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-33", 0 ],
-                    "source": [ "obj-3", 1 ]
                 }
             },
             {
@@ -3258,17 +3252,6 @@
                 }
             }
         ],
-        "parameters": {
-            "parameterbanks": {
-                "0": {
-                    "index": 0,
-                    "name": "",
-                    "parameters": [ "-", "-", "-", "-", "-", "-", "-", "-" ],
-                    "buttons": [ "-", "-", "-", "-", "-", "-", "-", "-" ]
-                }
-            },
-            "inherited_shortname": 1
-        },
         "autosave": 0,
         "oscsendudpport": 8002
     }

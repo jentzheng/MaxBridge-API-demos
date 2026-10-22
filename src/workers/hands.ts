@@ -1,8 +1,4 @@
 import { HandLandmarker, FilesetResolver, type NormalizedLandmark } from "@mediapipe/tasks-vision";
-const urlParams = new URLSearchParams(self.location.search);
-const numHands = parseInt(urlParams.get("numHands") || "3");
-
-// handle URL parameters
 
 const useLocalModel = import.meta.env.VITE_USE_LOCAL_MODEL;
 
@@ -14,41 +10,64 @@ const remoteWasmUrl = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@late
 const remoteModelUrl =
   "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 
-const vision = await FilesetResolver.forVisionTasks(
-  useLocalModel ? localWasmUrl : remoteWasmUrl,
-  true,
-);
-const model = await HandLandmarker.createFromOptions(vision, {
-  baseOptions: {
-    modelAssetPath: useLocalModel ? localModelUrl : remoteModelUrl,
-    delegate: "GPU",
-  },
-  numHands,
-  runningMode: "VIDEO",
-});
+async function initModel(numHands: number) {
+  const vision = await FilesetResolver.forVisionTasks(
+    useLocalModel ? localWasmUrl : remoteWasmUrl,
+    true,
+  );
+  const model = await HandLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: useLocalModel ? localModelUrl : remoteModelUrl,
+      delegate: "GPU",
+    },
+    numHands,
+    runningMode: "VIDEO",
+  });
+  return model;
+}
 
-self.postMessage({ type: "ready" });
+self.postMessage({ type: "READY" });
 
-type IncomingMessage = MessageEvent<{
-  type: "frame";
-  data: ImageBitmap;
-  seq: number;
-}>;
-
-self.onmessage = async (event: IncomingMessage) => {
-  if (event.data.type === "frame") {
-    const { landmarks } = model.detectForVideo(event.data.data, event.data.seq);
-    event.data.data.close();
-    self.postMessage({ type: "result", handLandmarks: landmarks });
+type IncomingMessage = MessageEvent<
+  | { type: "INIT"; numHands: number }
+  | {
+      type: "FRAME";
+      frame: VideoFrame;
+      seq: number;
+    }
+>;
+let model: HandLandmarker | null = null;
+self.onmessage = ({ data }: IncomingMessage) => {
+  if (data.type === "INIT") {
+    // Handle initialization if needed
+    initModel(data.numHands).then((m) => {
+      model = m;
+      self.postMessage({ type: "READY" });
+    });
+  } else if (data.type === "FRAME") {
+    if (model) {
+      const { landmarks } = model.detectForVideo(data.frame, data.seq);
+      self.postMessage({ type: "RESULT", handLandmarks: landmarks });
+    }
+    data.frame.close();
   }
+};
+
+self.onclose = () => {
+  model?.close();
+};
+
+self.onerror = (err) => {
+  console.error("[HandsWorker] Error:", err);
+  model?.close();
 };
 
 export type OutgoingMessage = MessageEvent<
   | {
-      type: "ready";
+      type: "READY";
     }
   | {
-      type: "result";
+      type: "RESULT";
       handLandmarks: NormalizedLandmark[][];
     }
 >;

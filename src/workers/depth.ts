@@ -1,4 +1,4 @@
-import { pipeline, env, LogLevel } from "@huggingface/transformers";
+import { pipeline, env, LogLevel, type ProgressInfo } from "@huggingface/transformers";
 
 const rootUrl = new URL(import.meta.env.BASE_URL, import.meta.url);
 env.logLevel = LogLevel.ERROR;
@@ -15,77 +15,85 @@ const depthEstimator = await pipeline(
   {
     device: "webgpu",
     dtype: "fp16",
+    progress_callback: (p) => {
+      self.postMessage({ type: "READY", info: p });
+    },
   },
 );
-
-self.postMessage({ type: "ready" });
 
 const canvas = new OffscreenCanvas(1, 1);
 const ctx = canvas.getContext("2d", {
   alpha: false,
-  desynchronized: true,
+  willReadFrequently: true,
 });
 
-type FrameMessage = {
-  type: "frame";
-  data: VideoFrame;
+type IncomingMessage = MessageEvent<{
+  type: "FRAME";
+  frame: VideoFrame;
   seq: number;
+}>;
+
+let isProcessing = false;
+let pendingFrame: IncomingMessage["data"] | null = null;
+
+self.onmessage = ({ data }: IncomingMessage) => {
+  if (data.type === "FRAME") {
+    if (isProcessing) {
+      pendingFrame?.frame.close();
+      pendingFrame = data;
+      return;
+    }
+    void processLatest(data.frame, data.seq);
+
+    data.frame.close();
+  }
 };
 
-let latestFrame: FrameMessage | null = null;
-let running = false;
-
-self.onmessage = (event: MessageEvent<FrameMessage>) => {
-  const msg = event.data;
-  if (msg.type !== "frame") return;
-  latestFrame?.data.close();
-  latestFrame = msg;
-  void processLatest();
-};
-
-async function processLatest() {
-  if (running || !ctx) return;
-  running = true;
+async function processLatest(frame: VideoFrame, seq: number) {
+  isProcessing = true;
   try {
-    while (latestFrame) {
-      const msg = latestFrame;
-      latestFrame = null;
-      const frame = msg.data;
-      if (canvas.width !== frame.displayWidth) canvas.width = frame.displayWidth;
-      if (canvas.height !== frame.displayHeight) canvas.height = frame.displayHeight;
-      ctx.drawImage(frame, 0, 0, frame.displayWidth, frame.displayHeight);
-      frame.close();
-      const result = await depthEstimator(canvas);
-      const depth = result.depth.data;
-      self.postMessage(
-        {
-          type: "result",
-          result: {
-            depth: {
-              data: depth,
-              width: result.depth.width,
-              height: result.depth.height,
-              channels: result.depth.channels,
-            },
+    if (!ctx) return;
+    if (canvas.width !== frame.displayWidth) {
+      canvas.width = frame.displayWidth;
+    }
+    if (canvas.height !== frame.displayHeight) {
+      canvas.height = frame.displayHeight;
+    }
+    ctx.drawImage(frame, 0, 0);
+    frame.close();
+    const result = await depthEstimator(canvas);
+    const depth = result.depth.data;
+    self.postMessage(
+      {
+        type: "RESULT",
+        result: {
+          depth: {
+            data: depth,
+            width: result.depth.width,
+            height: result.depth.height,
+            channels: result.depth.channels,
           },
         },
-        [depth.buffer],
-      );
-    }
+      },
+      [depth.buffer],
+    );
   } finally {
-    running = false;
-    if (latestFrame) {
-      void processLatest();
+    isProcessing = false;
+    const next = pendingFrame;
+    pendingFrame = null;
+    if (next) {
+      void processLatest(next.frame, next.seq);
     }
   }
 }
 
 export type OutgoingMessage = MessageEvent<
   | {
-      type: "ready";
+      type: "READY";
+      info: ProgressInfo;
     }
   | {
-      type: "result";
+      type: "RESULT";
       result: {
         depth: {
           data: Float32Array;

@@ -4,10 +4,6 @@ import {
   type ObjectDetectorResult,
 } from "@mediapipe/tasks-vision";
 
-const urlParams = new URLSearchParams(self.location.search);
-const maxResults = parseInt(urlParams.get("maxResults") || "3");
-const scoreThreshold = parseFloat(urlParams.get("scoreThreshold") || "0.5");
-
 const useLocalModel = import.meta.env.VITE_USE_LOCAL_MODEL;
 
 const appRoot = new URL(import.meta.env.BASE_URL, import.meta.url);
@@ -17,47 +13,68 @@ const remoteWasmUrl = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@late
 const remoteModelUrl =
   "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite";
 
-const vision = await FilesetResolver.forVisionTasks(
-  useLocalModel ? localWasmUrl : remoteWasmUrl,
-  true,
-);
+async function initModel(maxResults: number, scoreThreshold: number) {
+  const vision = await FilesetResolver.forVisionTasks(
+    useLocalModel ? localWasmUrl : remoteWasmUrl,
+    true,
+  );
 
-const model = await ObjectDetector.createFromOptions(vision, {
-  baseOptions: {
-    modelAssetPath: useLocalModel ? localModelUrl : remoteModelUrl,
-    delegate: "GPU",
-  },
-  maxResults: maxResults,
-  scoreThreshold: scoreThreshold,
-  runningMode: "VIDEO",
-});
+  return await ObjectDetector.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: useLocalModel ? localModelUrl : remoteModelUrl,
+      delegate: "GPU",
+    },
+    maxResults: maxResults,
+    scoreThreshold: scoreThreshold,
+    runningMode: "VIDEO",
+  });
+}
 
-self.postMessage({ type: "ready" });
+type IncomingMessage = MessageEvent<
+  | {
+      type: "INIT";
+      maxResults: number;
+      scoreThreshold: number;
+    }
+  | {
+      type: "FRAME";
+      frame: VideoFrame;
+      seq: number;
+    }
+>;
 
-type IncomingMessage = MessageEvent<{
-  type: "frame";
-  data: VideoFrame;
-  seq: number;
-}>;
+let model: ObjectDetector | null = null;
 
-self.onmessage = async (event: IncomingMessage) => {
-  if (event.data.type === "frame") {
-    const result = model.detectForVideo(event.data.data, event.data.seq);
-    event.data.data.close();
-    self.postMessage({ type: "result", result: result });
+self.onmessage = ({ data }: IncomingMessage) => {
+  if (data.type === "INIT") {
+    initModel(data.maxResults, data.scoreThreshold).then((m) => {
+      model = m;
+      self.postMessage({ type: "READY" });
+    });
+  } else if (data.type === "FRAME") {
+    if (model) {
+      const result = model.detectForVideo(data.frame, data.seq);
+      self.postMessage({ type: "RESULT", result: result });
+    }
+    data.frame.close();
   }
+};
+
+self.onclose = () => {
+  model?.close();
 };
 
 self.onerror = (err) => {
   console.error("[ObjectDetectWorker] Error:", err);
+  model?.close();
 };
 
 export type OutgoingMessage = MessageEvent<
   | {
-      type: "ready";
+      type: "READY";
     }
   | {
-      type: "result";
+      type: "RESULT";
       result: ObjectDetectorResult;
     }
 >;

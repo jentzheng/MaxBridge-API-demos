@@ -4,12 +4,11 @@ import { useEffect, useRef, useCallback } from "react";
 import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { z } from "zod";
 
-import type { UYVYFrame } from "@/libs/webgl";
 import type { OutgoingMessage } from "@/workers/faceLandmark";
 
 import Camera from "@/components/Camera";
 import { writeJitMatBuffer } from "@/libs/bufferHelper";
-import workerUrl from "@/workers/faceLandmark?worker&url";
+import Worker from "@/workers/faceLandmark?worker";
 
 const searchParam = z.object({
   numFaces: z.number().default(3),
@@ -29,29 +28,28 @@ function RouteComponent() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const workerRef = useRef<Worker | null>(null);
+  const isModelReady = useRef(false);
 
   useEffect(() => {
-    const url = new URL(workerUrl, import.meta.url);
-    url.searchParams.set("numFaces", searchParams.numFaces.toString());
-    const worker = new Worker(url, {
-      type: "module",
-    });
+    const worker = new Worker();
     workerRef.current = worker;
+    worker.postMessage({ type: "INIT", numFaces: searchParams.numFaces });
 
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!ctx || !canvas) return;
     const drawingUtils = new DrawingUtils(ctx);
 
-    worker.onmessage = (event: OutgoingMessage) => {
-      switch (event.data.type) {
-        case "ready": {
+    worker.onmessage = ({ data }: OutgoingMessage) => {
+      switch (data.type) {
+        case "READY": {
           console.log("Worker is ready");
+          isModelReady.current = true;
           break;
         }
-        case "result": {
-          const numFaces = event.data.faceLandmarks.length;
-          const numMarks = event.data.faceLandmarks[0]?.length || 0;
+        case "RESULT": {
+          const numFaces = data.faceLandmarks.length;
+          const numMarks = data.faceLandmarks[0]?.length || 0;
           const planecount = 3;
           const packet = writeJitMatBuffer(
             `${searchParams.username}_facelandmarks`,
@@ -60,7 +58,7 @@ function RouteComponent() {
             numMarks,
             numFaces,
             Float32Array.from(
-              event.data.faceLandmarks.flatMap((landmarks) =>
+              data.faceLandmarks.flatMap((landmarks) =>
                 landmarks.flatMap(({ x, y, z }) => [x, y, z]),
               ),
             ),
@@ -72,7 +70,7 @@ function RouteComponent() {
             return;
           }
 
-          event.data.faceLandmarks.forEach((landmarks) => {
+          data.faceLandmarks.forEach((landmarks) => {
             drawingUtils.drawLandmarks(landmarks, {
               color: "#00ff00",
               radius: 1,
@@ -100,10 +98,16 @@ function RouteComponent() {
     if (canvas.width !== frame.displayWidth) canvas.width = frame.displayWidth;
     if (canvas.height !== frame.displayHeight) canvas.height = frame.displayHeight;
 
+    if (!isModelReady.current) {
+      console.log("Model is not ready yet");
+      frame.close();
+      return;
+    }
+
     worker.postMessage(
       {
-        type: "frame",
-        data: frame,
+        type: "FRAME",
+        frame,
         seq,
       },
       [frame],

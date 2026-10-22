@@ -6,7 +6,7 @@ import type { OutgoingMessage } from "@/workers/depth";
 
 import Camera from "@/components/Camera";
 import { writeJitMatBuffer } from "@/libs/bufferHelper";
-import workerUrl from "@/workers/depth?worker&url";
+import Worker from "@/workers/depth?worker";
 
 export const Route = createFileRoute("/depth")({
   component: RouteComponent,
@@ -21,28 +21,35 @@ function RouteComponent() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const workerRef = useRef<Worker | null>(null);
+  const isModelReady = useRef(false);
 
-  const handleCameraFrame = useCallback((video: VideoFrame, seq: number) => {
+  const handleCameraFrame = useCallback((frame: VideoFrame, seq: number) => {
+    if (isModelReady.current === false) {
+      frame.close();
+      return;
+    }
     const canvas = canvasRef.current;
     const worker = workerRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx || !worker) return;
 
-    worker.postMessage({ type: "frame", data: video, seq }, [video]);
+    worker.postMessage({ type: "FRAME", frame, seq }, [frame]);
   }, []);
 
   useEffect(() => {
-    const worker = new Worker(new URL(workerUrl, import.meta.url), {
-      type: "module",
-    });
+    const worker = new Worker();
     workerRef.current = worker;
     const canvas = canvasRef.current;
     const ctx = canvasRef.current?.getContext("2d");
     if (!canvas || !ctx) return;
 
-    worker.onmessage = (event: OutgoingMessage) => {
-      if (event.data.type === "result") {
-        const { depth } = event.data.result;
+    worker.onmessage = ({ data }: OutgoingMessage) => {
+      if (data.type === "READY") {
+        if (data.info.status === "ready") {
+          isModelReady.current = true;
+        }
+      } else if (data.type === "RESULT") {
+        const { depth } = data.result;
         const packet = writeJitMatBuffer(
           `${searchParams.username}_depth`,
           depth.channels,

@@ -132,8 +132,6 @@ export class WebGLRenderer {
       1 / frame.displayWidth,
     );
 
-    frame.close();
-
     const data = new Uint8Array(width * height * 2);
     // flip the Y axis to match WebGL's coordinate system
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);

@@ -188,7 +188,6 @@ export default function CameraComponent({ onFrame, sendMessage }: Props) {
         const videoFrame = new VideoFrame(video, {
           timestamp: now,
         });
-        const remoteFrame = videoFrame.clone();
         const uyvy = renderer.draw(videoFrame);
         const camPacket = writeJitMatBuffer(
           `${searchParams.username}_camera`,
@@ -200,9 +199,9 @@ export default function CameraComponent({ onFrame, sendMessage }: Props) {
         );
 
         if (onFrame) {
-          onFrame(remoteFrame, remoteFrame.timestamp);
+          onFrame(videoFrame, videoFrame.timestamp);
         } else {
-          remoteFrame.close();
+          videoFrame.close();
         }
 
         sendMessage(camPacket, false);
