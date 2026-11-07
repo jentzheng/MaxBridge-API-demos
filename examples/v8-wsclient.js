@@ -32,7 +32,6 @@ socket.onmessage = (event) => {
         // 1. matrixName length
         const nameLen = view.getUint8(offset);
         offset += 1;
-        // @ts-expect-error 'data.slice' is deprecated
         const matrixName = decoder.decode(data.slice(offset, offset + nameLen));
         offset += nameLen;
         const planeCount = view.getUint8(offset);
@@ -56,6 +55,10 @@ socket.onmessage = (event) => {
             matrix.copyarraytomatrix(pixelData);
         }
         else if (type === "float32") {
+            if (pixelBytes.length === 0) {
+                outlet(0, "jit_matrix", matrix.name);
+                return;
+            }
             const pixelData = new Float32Array(pixelBytes.buffer);
             matrix.copyarraytomatrix(pixelData);
         }
@@ -65,6 +68,12 @@ socket.onmessage = (event) => {
         const message = JSON.parse(data);
         if (message.type === "users") {
             options.users = message.users;
+            outlet_dictionary(1, { users: { data: options.users } });
+        }
+        else if (message.type === "result") {
+            outlet_dictionary(1, {
+                [message.name]: message.data,
+            });
         }
         else if (message.type === "button") {
             const [_, username, type, index] = message.value.split("/");

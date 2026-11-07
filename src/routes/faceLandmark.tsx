@@ -21,7 +21,7 @@ export const Route = createFileRoute("/faceLandmark")({
 
 function RouteComponent() {
   const searchParams = Route.useSearch();
-  const { sendMessage } = useWebSocket(searchParams.wsaddress, {
+  const { sendMessage, sendJsonMessage } = useWebSocket(searchParams.wsaddress, {
     share: true,
     queryParams: { username: searchParams.username, role: "sender" },
   });
@@ -64,6 +64,34 @@ function RouteComponent() {
             ),
           );
           sendMessage(packet, false);
+          const faceData = Object.fromEntries(
+            data.faceLandmarks.map((_, index) => {
+              const blendshapes = data.faceBlendshapes[index];
+              const matrix = data.facialTransformationMatrixes[index];
+
+              return [
+                `face_${index}`,
+                {
+                  blendshapes: Object.fromEntries(
+                    (blendshapes?.categories ?? []).map(({ categoryName, score }) => [
+                      categoryName,
+                      score,
+                    ]),
+                  ),
+                  matrix,
+                },
+              ];
+            }),
+          );
+
+          sendJsonMessage({
+            type: "result",
+            name: `${searchParams.username}_facelandmarks`,
+            data: {
+              count: numFaces,
+              ...faceData,
+            },
+          });
 
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           if (numFaces === 0) {
@@ -88,7 +116,7 @@ function RouteComponent() {
     return () => {
       worker.terminate();
     };
-  }, [searchParams, sendMessage]);
+  }, [searchParams, sendMessage, sendJsonMessage]);
 
   const handleCameraFrame = useCallback((frame: VideoFrame, seq: number) => {
     const canvas = canvasRef.current;

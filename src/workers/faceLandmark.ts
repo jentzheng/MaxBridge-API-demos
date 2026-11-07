@@ -1,4 +1,10 @@
-import { FaceLandmarker, FilesetResolver, type NormalizedLandmark } from "@mediapipe/tasks-vision";
+import {
+  FaceLandmarker,
+  FilesetResolver,
+  type NormalizedLandmark,
+  type Classifications,
+  type Matrix,
+} from "@mediapipe/tasks-vision";
 
 // determine whether to use local model or remote model
 const useLocalModel = import.meta.env.VITE_USE_LOCAL_MODEL;
@@ -22,6 +28,8 @@ async function initModel(numFaces: number) {
     },
     numFaces,
     runningMode: "VIDEO",
+    outputFaceBlendshapes: true,
+    outputFacialTransformationMatrixes: true,
   });
 }
 
@@ -47,8 +55,17 @@ self.onmessage = ({ data }: IncomingMessage) => {
     });
   } else if (data.type === "FRAME") {
     if (model) {
-      const { faceLandmarks } = model.detectForVideo(data.frame, data.seq);
-      self.postMessage({ type: "RESULT", faceLandmarks: faceLandmarks });
+      const { faceLandmarks, faceBlendshapes, facialTransformationMatrixes } = model.detectForVideo(
+        data.frame,
+        data.seq,
+      );
+
+      self.postMessage({
+        type: "RESULT",
+        faceLandmarks: faceLandmarks,
+        faceBlendshapes: faceBlendshapes,
+        facialTransformationMatrixes: facialTransformationMatrixes,
+      });
     }
 
     data.frame.close();
@@ -71,5 +88,7 @@ export type OutgoingMessage = MessageEvent<
   | {
       type: "RESULT";
       faceLandmarks: NormalizedLandmark[][];
+      faceBlendshapes: Classifications[];
+      facialTransformationMatrixes: Matrix[];
     }
 >;

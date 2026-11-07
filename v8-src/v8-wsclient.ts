@@ -21,6 +21,7 @@ socket.onopen = () => {
 };
 
 const decoder = new TextDecoder();
+type MaxMatrixType = "char" | "long" | "float32" | "float64";
 
 const typeMap = new Map<number, MaxMatrixType>([
   [0, "char"],
@@ -35,12 +36,10 @@ socket.onmessage = (event) => {
 
   if (data instanceof Uint8Array) {
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-
     let offset = 0;
     // 1. matrixName length
     const nameLen = view.getUint8(offset);
     offset += 1;
-    // @ts-expect-error 'data.slice' is deprecated
     const matrixName = decoder.decode(data.slice(offset, offset + nameLen));
     offset += nameLen;
     const planeCount = view.getUint8(offset);
@@ -60,10 +59,15 @@ socket.onmessage = (event) => {
     if (matrix.dim[0] !== width || matrix.dim[1] !== height) {
       matrix.dim = [width, height];
     }
+
     if (type === "char") {
       const pixelData = new Uint8Array(pixelBytes.buffer);
       matrix.copyarraytomatrix(pixelData);
     } else if (type === "float32") {
+      if (pixelBytes.length === 0) {
+        outlet(0, "jit_matrix", matrix.name);
+        return;
+      }
       const pixelData = new Float32Array(pixelBytes.buffer);
       matrix.copyarraytomatrix(pixelData);
     }
@@ -71,9 +75,13 @@ socket.onmessage = (event) => {
     outlet(0, "jit_matrix", matrix.name);
   } else if (typeof data === "string") {
     const message = JSON.parse(data) as JSONMessage;
-
     if (message.type === "users") {
       options.users = message.users;
+      outlet_dictionary(1, { users: { data: options.users } });
+    } else if (message.type === "result") {
+      outlet_dictionary(1, {
+        [message.name]: message.data,
+      });
     } else if (message.type === "button") {
       const [_, username, type, index] = message.value.split("/");
       const msg = `${type}-${index}`;
@@ -86,6 +94,12 @@ type JSONMessage =
   | {
       type: "users";
       users: string[];
+    }
+  | {
+      type: "result";
+      name: string;
+      dataType: string;
+      data: Record<string, unknown>;
     }
   | {
       type: "button";

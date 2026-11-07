@@ -44,8 +44,6 @@ self.onmessage = ({ data }: IncomingMessage) => {
       return;
     }
     void processLatest(data.frame, data.seq);
-
-    data.frame.close();
   }
 };
 
